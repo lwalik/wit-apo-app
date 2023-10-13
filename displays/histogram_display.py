@@ -1,12 +1,12 @@
 import tkinter as tk
-from image_handler import ImageHandler
-from histogram import Histogram
+from services.image_service import ImageService
+from classes.histogram import Histogram
 
 class HistogramDisplay(tk.Frame):
     def __init__(self, parent, image_path, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.parent = parent
-        self.handler = ImageHandler(image_path)
+        self.handler = ImageService(image_path)
         self.display_histogram()
 
 

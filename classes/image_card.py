@@ -1,4 +1,3 @@
-from image_handler import ImageHandler
 import cv2
 from PIL import Image, ImageTk
 import tkinter as tk

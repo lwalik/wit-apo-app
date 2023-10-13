@@ -1,4 +1,4 @@
-from app_window import AppWindow
+from classes.app_window import AppWindow
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog
-from image_display import ImageDisplay
-from histogram_display import HistogramDisplay
+from displays.image_display import ImageDisplay
+from displays.histogram_display import HistogramDisplay
 
 class AppWindow(tk.Tk):
     def __init__(self, *args, **kwargs):

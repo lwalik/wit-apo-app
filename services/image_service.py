@@ -1,6 +1,6 @@
 import cv2
 
-class ImageHandler:
+class ImageService:
     def __init__(self, image_path=None):
         self.image = None
         if image_path:
