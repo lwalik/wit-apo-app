@@ -21,6 +21,9 @@ class ImageDisplay:
         histogram_button = Button(self.window, text="Stwórz Histogram", command=self.create_histogram)
         histogram_button.pack(pady=10)
 
+        duplicate_button = Button(self.window, text="Duplikuj Obraz", command=self.duplicate_image)
+        duplicate_button.pack(pady=10)
+
     def create_histogram(self):
         histogram = Histogram(self.image)
         hist_image = histogram.generate_histogram()
@@ -31,3 +34,7 @@ class ImageDisplay:
         label = Label(self.window, image=hist_image_tk)
         label.image = hist_image_tk
         label.pack(pady=10)
+
+    def duplicate_image(self):
+        # Tworzymy nową instancję ImageDisplay z tym samym obrazem
+        ImageDisplay(self.image)
