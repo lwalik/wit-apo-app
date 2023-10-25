@@ -13,11 +13,18 @@ class ImageWindow:
         self.top.title(os.path.basename(image_path))
         self.image = cv2.imread(image_path)
         self.display_image()
-        Button(self.top, text="Stwórz Histogram", command=self.show_histogram).pack()
-        self.show_lut_button = Button(self.top, text="Pokaż tablicę LUT", command=self.show_lut_table)
-        self.show_lut_button.pack()
         self.lut_window = None  # Okno tablicy LUT
         self.lut_array = self.calculate_lut_array(self.image)  # Oblicz tablicę LUT
+
+        menubar = Menu(self.top)
+        self.top.config(menu=menubar)
+
+        # Dodawanie opcji do paska menu
+        plik_menu = Menu(menubar, tearoff=0)
+        plik_menu.add_command(label="Histogram", command=self.show_histogram)
+        plik_menu.add_command(label="Tablica LUT", command=self.show_lut_table)
+
+        menubar.add_cascade(label="Plik", menu=plik_menu)
 
     def display_image(self):
         b, g, r = cv2.split(self.image)
