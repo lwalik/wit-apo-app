@@ -1,11 +1,11 @@
 import cv2
-import matplotlib.pyplot as plt
 from tkinter import filedialog, Tk, Button, Label, Toplevel, Menu, BOTH, Frame, Canvas, Scrollbar
 from PIL import Image, ImageTk
 import os
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
 from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
 
 class ImageWindow:
     def __init__(self, image_path):
@@ -38,37 +38,40 @@ class ImageWindow:
     def show_histogram(self):
         histogram_window = Toplevel()
         histogram_window.title("Histogram - " + self.top.title())
-        fig = Figure(figsize=(6, 4))
-        ax = fig.add_subplot(111)
+        fig, axs = plt.subplots(4, 1, figsize=(6, 8))  # Utwórz 4 subplots
 
         image = self.image.copy()
 
-        if len(image.shape) == 2:
-            # Obraz monochromatyczny
-            self.calculate_and_plot_histogram(image, ax, 'gray')
-        elif len(image.shape) == 3:
-            if np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(image[:, :, 0], image[:, :, 2]):
-                # Wszystkie kanały są takie same, traktujemy obraz jako monochromatyczny
-                self.calculate_and_plot_histogram(image[:, :, 0], ax, 'gray')
-            else:
-                # Obraz kolorowy
-                colors = ('b', 'g', 'r')
-                for i, color in enumerate(colors):
-                    self.calculate_and_plot_histogram(image[:, :, i], ax, color)
+        # Histogram dla obrazów monochromatycznych
+        if len(image.shape) == 2 or (len(image.shape) == 3 and np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(image[:, :, 0], image[:, :, 2])):
+            self.calculate_and_plot_histogram(image, axs[0], 'gray')
+            axs[0].set_title('Monochromatyczny')
+            for i in range(1, 4):
+                axs[i].set_title(f'{["R", "G", "B"][i-1]} (brak)')
+        else:
+            axs[0].set_title('Monochromatyczny (brak)')
+            # Histogramy dla kanałów RGB
+            colors = ('r', 'g', 'b')
+            for i, color in enumerate(colors):
+                self.calculate_and_plot_histogram(image[:, :, i], axs[i + 1], color)
+                axs[i + 1].set_title(f'Kanał {color.upper()}')
 
-        ax.set_xlabel("Wartość piksela")
-        ax.set_ylabel("Liczba pikseli")
-        ax.set_xlim([0, 256])
+        for ax in axs:
+            ax.set_xlabel("Wartość piksela")
+            ax.set_ylabel("Liczba pikseli")
+            ax.set_xlim([0, 256])
 
+        plt.tight_layout()
         canvas = FigureCanvasTkAgg(fig, master=histogram_window)
         canvas_widget = canvas.get_tk_widget()
         canvas_widget.pack(fill=BOTH, expand=True, side='top')
 
     def calculate_and_plot_histogram(self, channel, ax, color):
-        hist = np.zeros(256)
-        for value in range(256):
-            hist[value] = np.sum(channel == value)
-        ax.bar(range(256), hist, color=color, alpha=0.6)
+        if channel is not None:
+            hist = np.zeros(256)
+            for value in range(256):
+                hist[value] = np.sum(channel == value)
+            ax.bar(range(256), hist, color=color, alpha=0.6)
 
     def calculate_lut_array(self, image):
         lut_array = np.zeros(256, dtype=np.uint32)  # Utwórz tablicę LUT o rozmiarze 256 komórek
@@ -120,9 +123,7 @@ class MainApp:
     def load_image(self):
         file_path = filedialog.askopenfilename(title='Select Image')
         if file_path:
-            image_window = ImageWindow(file_path)
-
-
+            ImageWindow(file_path)
 
     def on_closing(self):
         self.root.quit()
