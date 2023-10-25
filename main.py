@@ -8,9 +8,9 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 
 class ImageWindow:
-    def __init__(self, image_path):
-        self.top = Toplevel()
-        self.top.title(os.path.basename(image_path))
+    def __init__(self, root, image_path, is_copy=False):
+        self.top = Toplevel(root)
+        self.top.title(os.path.basename(image_path) + (" - Kopia" if is_copy else ""))
         self.image = cv2.imread(image_path)
         self.display_image()
         self.lut_window = None  # Okno tablicy LUT
@@ -23,6 +23,8 @@ class ImageWindow:
         plik_menu = Menu(menubar, tearoff=0)
         plik_menu.add_command(label="Histogram", command=self.show_histogram)
         plik_menu.add_command(label="Tablica LUT", command=self.show_lut_table)
+        plik_menu.add_command(label="Duplikuj", command=lambda: ImageWindow(root, image_path, is_copy=True))
+        plik_menu.add_command(label="Zapisz", command=self.save_image)
 
         menubar.add_cascade(label="Plik", menu=plik_menu)
 
@@ -47,7 +49,7 @@ class ImageWindow:
             self.calculate_and_plot_histogram(image, axs[0], 'gray')
             axs[0].set_title('Monochromatyczny')
             for i in range(1, 4):
-                axs[i].set_title(f'{["R", "G", "B"][i-1]} (brak)')
+                axs[i].set_title(f'Kanał {["R", "G", "B"][i-1]} (brak)')
         else:
             axs[0].set_title('Monochromatyczny (brak)')
             # Histogramy dla kanałów RGB
@@ -107,6 +109,11 @@ class ImageWindow:
         else:
             self.lut_window.deiconify()  # Pokaż okno tablicy LUT
 
+    def save_image(self):
+        file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG files", "*.png"), ("JPEG files", "*.jpg"), ("All files", "*.*")])
+        if file_path:
+            cv2.imwrite(file_path, self.image)
+
 class MainApp:
     def __init__(self, root):
         self.root = root
@@ -123,7 +130,7 @@ class MainApp:
     def load_image(self):
         file_path = filedialog.askopenfilename(title='Select Image')
         if file_path:
-            ImageWindow(file_path)
+            ImageWindow(self.root, file_path)
 
     def on_closing(self):
         self.root.quit()
