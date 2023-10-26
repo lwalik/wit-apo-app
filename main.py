@@ -1,9 +1,8 @@
 import cv2
-from tkinter import filedialog, Tk, Label, Toplevel, Menu, Frame, Canvas, Scrollbar, ttk
+from tkinter import filedialog, Tk, Label, Toplevel, Menu, Frame, Canvas, Scrollbar, ttk, Scale, Button
 from PIL import Image, ImageTk
 import os
 import numpy as np
-from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 
@@ -27,6 +26,7 @@ class ImageWindow:
         plik_menu.add_command(label="Tablica LUT", command=self.show_lut_tables)
         plik_menu.add_command(label="Duplikuj", command=lambda: ImageWindow(root, image_path, is_copy=True))
         plik_menu.add_command(label="Zapisz", command=self.save_image)
+        plik_menu.add_command(label="Rozciąganie liniowe", command=self.linear_stretching)
 
         menubar.add_cascade(label="Plik", menu=plik_menu)
 
@@ -59,7 +59,8 @@ class ImageWindow:
             self.show_statistics(axs[0], hist, gray_image)
 
             b, g, r = cv2.split(image)
-            unweighted_image = np.round((r.astype(np.uint32) + g.astype(np.uint32) + b.astype(np.uint32)) / 3).astype(np.uint8)
+            unweighted_image = np.round((r.astype(np.uint32) + g.astype(np.uint32) + b.astype(np.uint32)) / 3).astype(
+                np.uint8)
             hist = self.calculate_and_plot_histogram(unweighted_image, axs[1], 'gray')
             axs[1].set_title('Intensity (unweighted)')
             self.show_statistics(axs[1], hist, unweighted_image)
@@ -98,7 +99,9 @@ class ImageWindow:
                 max_val = np.max(channel)
                 mean_val = round(np.mean(channel), 2)
                 std_dev = np.std(channel)
-                ax.text(1.05, 0.2, f'Mediana: {median:.2f}\nMin: {min_val}\nMax: {max_val}\nŚrednia: {mean_val}\nOdch. std.: {std_dev:.2f}', transform=ax.transAxes)
+                ax.text(1.05, 0.2,
+                        f'Mediana: {median:.2f}\nMin: {min_val}\nMax: {max_val}\nŚrednia: {mean_val}\nOdch. std.: {std_dev:.2f}',
+                        transform=ax.transAxes)
 
     def calculate_lut_arrays(self, image):
         lut_arrays = {}
@@ -108,10 +111,11 @@ class ImageWindow:
             gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             lut_arrays['Intensity (weighted)'] = self.calculate_lut_array(gray_image)
             b, g, r = cv2.split(image)
-            unweighted_image = np.round((r.astype(np.uint32) + g.astype(np.uint32) + b.astype(np.uint32)) / 3).astype(np.uint8)
+            unweighted_image = np.round((r.astype(np.uint32) + g.astype(np.uint32) + b.astype(np.uint32)) / 3).astype(
+                np.uint8)
             lut_arrays['Intensity (unweighted)'] = self.calculate_lut_array(unweighted_image)
             for i, color in enumerate(['R', 'G', 'B']):
-                lut_arrays[color] = self.calculate_lut_array(image[:, :, 2-i])
+                lut_arrays[color] = self.calculate_lut_array(image[:, :, 2 - i])
 
         return lut_arrays
 
@@ -181,9 +185,51 @@ class ImageWindow:
     def check_if_monochrome(self, image):
         if len(image.shape) == 2:
             return True
-        if len(image.shape) == 3 and np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(image[:, :, 0], image[:, :, 2]):
+        if len(image.shape) == 3 and np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(
+                image[:, :, 0], image[:, :, 2]):
             return True
         return False
+
+    def linear_stretching(self):
+        def apply_linear_stretching():
+            p1 = min_scale.get()
+            p2 = max_scale.get()
+            q3 = new_min_scale.get()
+            q4 = new_max_scale.get()
+            self.image = self.perform_linear_stretching(self.image, p1, p2, q3, q4)
+            self.display_image()
+            stretching_window.destroy()
+
+        stretching_window = Toplevel(self.top)
+        stretching_window.title("Rozciąganie liniowe")
+        stretching_window.geometry('250x300')
+
+        min_scale = Scale(stretching_window, from_=0, to=255, orient="horizontal", label="Minimum", width=10, length=200)
+        min_scale.pack()
+        min_scale.set(0)
+
+        max_scale = Scale(stretching_window, from_=0, to=255, orient="horizontal", label="Maksimum", width=10, length=200)
+        max_scale.pack()
+        max_scale.set(255)
+
+        new_min_scale = Scale(stretching_window, from_=0, to=255, orient="horizontal", label="Nowe Minimum", width=10, length=200)
+        new_min_scale.pack()
+        new_min_scale.set(0)
+
+        new_max_scale = Scale(stretching_window, from_=0, to=255, orient="horizontal", label="Nowe Maksimum", width=10, length=200)
+        new_max_scale.pack()
+        new_max_scale.set(255)
+
+        apply_button = Button(stretching_window, text="Zastosuj", command=apply_linear_stretching)
+        apply_button.pack()
+
+    def perform_linear_stretching(self, image, p1, p2, q3, q4):
+        result = np.copy(image)
+        mask = (image >= p1) & (image <= p2)
+        result[mask] = ((image[mask] - p1) * ((q4 - q3) / (p2 - p1)) + q3).astype(np.uint8)
+        result[image < p1] = q3
+        result[image > p2] = q4
+        return result
 
 
 class MainApp:
@@ -203,11 +249,10 @@ class MainApp:
         menubar = Menu(root)
         root.config(menu=menubar)
 
-        lab2_menu = Menu(menubar, tearoff=0)
-        lab2_menu.add_command(label="Wczytaj obraz", command=self.load_image)
-        menubar.add_cascade(label="Lab 1", menu=lab2_menu)
-        lab2_menu = Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Lab 2", menu=lab2_menu)
+        lab1_menu = Menu(menubar, tearoff=0)
+        lab1_menu.add_command(label="Wczytaj obraz", command=self.load_image)
+        menubar.add_cascade(label="Lab 1", menu=lab1_menu)
+
 
     def load_image(self):
         file_path = filedialog.askopenfilename(title='Select Image')
@@ -216,7 +261,6 @@ class MainApp:
 
     def on_closing(self):
         self.root.quit()
-
 
 def main():
     root = Tk()
