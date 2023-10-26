@@ -43,7 +43,8 @@ class ImageWindow:
         histogram_window = Toplevel()
         histogram_window.title("Histogram - " + self.top.title())
         num_histograms = 1 if self.is_monochrome else 5
-        fig, axs = plt.subplots(num_histograms, 1, figsize=(6, 10))  # Utwórz odpowiednią liczbę subplots
+        height = 3 if self.is_monochrome else 10
+        fig, axs = plt.subplots(num_histograms, 1, figsize=(6, height))  # Utwórz odpowiednią liczbę subplots
 
         image = self.image.copy()
 
@@ -132,7 +133,8 @@ class ImageWindow:
     def create_lut_window(self, lut_arrays):
         lut_window = Toplevel()
         lut_window.title(f"Tablica LUT - {self.top.title()}")
-        lut_window.geometry("955x270")
+        width = 235 if self.is_monochrome else 1185
+        lut_window.geometry(f'{width}x270')
 
         if self.is_monochrome:
             names = ["Intensity"]
