@@ -45,34 +45,17 @@ class ImageWindow:
 
         image = self.image.copy()
 
-        # Histogram dla obrazów monochromatycznych
-        # if len(image.shape) == 2 or (
-        #         len(image.shape) == 3 and np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(
-        #         image[:, :, 0], image[:, :, 2])):
-        #     self.calculate_and_plot_histogram(image, axs[0], 'gray')
-        #     axs[0].set_title('Monochromatyczny')
-        #     for i in range(1, 4):
-        #         axs[i].set_title(f'{["R", "G", "B"][i - 1]} (brak)')
-        # else:
-        #     # Histogramy dla kanałów RGB
-        #     colors = ('r', 'g', 'b')
-        #     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        #     self.calculate_and_plot_histogram(gray_image, axs[0], 'gray')
-        #     axs[0].set_title('Monochromatyczny')
-        #     for i, color in enumerate(colors):
-        #         self.calculate_and_plot_histogram(image[:, :, 2-i], axs[i + 1], color)
-        #         axs[i + 1].set_title(f'{color.upper()}')
 
         if len(image.shape) == 2 or (
                 len(image.shape) == 3 and np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(
             image[:, :, 0], image[:, :, 2])):
             self.calculate_and_plot_histogram(image, axs[0], 'gray')
-            axs[0].set_title('Monochromatyczny')
+            axs[0].set_title('Intensity (weighted)')
 
         else:
             gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             self.calculate_and_plot_histogram(gray_image, axs[0], 'gray')
-            axs[0].set_title('Monochromatyczny')
+            axs[0].set_title('Intensity (weighted)')
 
         colors = ('r', 'g', 'b')
         for i, color in enumerate(colors):
@@ -101,12 +84,12 @@ class ImageWindow:
         if len(image.shape) == 2 or (
                 len(image.shape) == 3 and np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(
                 image[:, :, 0], image[:, :, 2])):
-            lut_arrays['Monochromatyczny'] = self.calculate_lut_array(image)
+            lut_arrays['Intensity (weighted)'] = self.calculate_lut_array(image)
             for color in ['R', 'G', 'B']:
                 lut_arrays[color] = np.zeros(256, dtype=np.uint32)
         elif len(image.shape) == 3:
             gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            lut_arrays['Monochromatyczny'] = self.calculate_lut_array(gray_image)
+            lut_arrays['Intensity (weighted)'] = self.calculate_lut_array(gray_image)
             for i, color in enumerate(['R', 'G', 'B']):
                 lut_arrays[color] = self.calculate_lut_array(image[:, :, 2-i])
 
@@ -132,10 +115,10 @@ class ImageWindow:
         lut_window.title(f"Tablica LUT - {self.top.title()}")
         lut_window.geometry("955x270")
 
-        for name in ["Monochromatyczny", "R", "G", "B"]:
+        for name in ["Intensity (weighted)", "R", "G", "B"]:
             lut_array = lut_arrays[name]
             lut_frame = Frame(lut_window)
-            lut_frame.grid(row=0, column=["Monochromatyczny", "R", "G", "B"].index(name), padx=10, pady=10)
+            lut_frame.grid(row=0, column=["Intensity (weighted)", "R", "G", "B"].index(name), padx=10, pady=10)
 
             Label(lut_frame, text=name + (" (Pusta)" if np.sum(lut_array) == 0 else "")).pack()
 
