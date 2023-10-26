@@ -1,11 +1,12 @@
 import cv2
-from tkinter import filedialog, Tk, Button, Label, Toplevel, Menu, BOTH, Frame, Canvas, Scrollbar
+from tkinter import filedialog, Tk, Label, Toplevel, Menu, Frame, Canvas, Scrollbar, ttk
 from PIL import Image, ImageTk
 import os
 import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
+
 
 class ImageWindow:
     def __init__(self, root, image_path, is_copy=False):
@@ -14,7 +15,7 @@ class ImageWindow:
         self.image = cv2.imread(image_path)
         self.display_image()
         self.lut_window = None  # Okno tablicy LUT
-        self.lut_array = self.calculate_lut_array(self.image)  # Oblicz tablicę LUT
+        self.lut_arrays = self.calculate_lut_arrays(self.image)  # Oblicz tablice LUT
 
         menubar = Menu(self.top)
         self.top.config(menu=menubar)
@@ -22,7 +23,7 @@ class ImageWindow:
         # Dodawanie opcji do paska menu
         plik_menu = Menu(menubar, tearoff=0)
         plik_menu.add_command(label="Histogram", command=self.show_histogram)
-        plik_menu.add_command(label="Tablica LUT", command=self.show_lut_table)
+        plik_menu.add_command(label="Tablica LUT", command=self.show_lut_tables)
         plik_menu.add_command(label="Duplikuj", command=lambda: ImageWindow(root, image_path, is_copy=True))
         plik_menu.add_command(label="Zapisz", command=self.save_image)
 
@@ -45,18 +46,38 @@ class ImageWindow:
         image = self.image.copy()
 
         # Histogram dla obrazów monochromatycznych
-        if len(image.shape) == 2 or (len(image.shape) == 3 and np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(image[:, :, 0], image[:, :, 2])):
+        # if len(image.shape) == 2 or (
+        #         len(image.shape) == 3 and np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(
+        #         image[:, :, 0], image[:, :, 2])):
+        #     self.calculate_and_plot_histogram(image, axs[0], 'gray')
+        #     axs[0].set_title('Monochromatyczny')
+        #     for i in range(1, 4):
+        #         axs[i].set_title(f'{["R", "G", "B"][i - 1]} (brak)')
+        # else:
+        #     # Histogramy dla kanałów RGB
+        #     colors = ('r', 'g', 'b')
+        #     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        #     self.calculate_and_plot_histogram(gray_image, axs[0], 'gray')
+        #     axs[0].set_title('Monochromatyczny')
+        #     for i, color in enumerate(colors):
+        #         self.calculate_and_plot_histogram(image[:, :, 2-i], axs[i + 1], color)
+        #         axs[i + 1].set_title(f'{color.upper()}')
+
+        if len(image.shape) == 2 or (
+                len(image.shape) == 3 and np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(
+            image[:, :, 0], image[:, :, 2])):
             self.calculate_and_plot_histogram(image, axs[0], 'gray')
             axs[0].set_title('Monochromatyczny')
-            for i in range(1, 4):
-                axs[i].set_title(f'Kanał {["R", "G", "B"][i-1]} (brak)')
+
         else:
-            axs[0].set_title('Monochromatyczny (brak)')
-            # Histogramy dla kanałów RGB
-            colors = ('r', 'g', 'b')
-            for i, color in enumerate(colors):
-                self.calculate_and_plot_histogram(image[:, :, i], axs[i + 1], color)
-                axs[i + 1].set_title(f'Kanał {color.upper()}')
+            gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            self.calculate_and_plot_histogram(gray_image, axs[0], 'gray')
+            axs[0].set_title('Monochromatyczny')
+
+        colors = ('r', 'g', 'b')
+        for i, color in enumerate(colors):
+            self.calculate_and_plot_histogram(image[:, :, 2 - i], axs[i + 1], color)
+            axs[i + 1].set_title(f'{color.upper()}')
 
         for ax in axs:
             ax.set_xlabel("Wartość piksela")
@@ -66,7 +87,7 @@ class ImageWindow:
         plt.tight_layout()
         canvas = FigureCanvasTkAgg(fig, master=histogram_window)
         canvas_widget = canvas.get_tk_widget()
-        canvas_widget.pack(fill=BOTH, expand=True, side='top')
+        canvas_widget.pack(fill='both', expand=True, side='top')
 
     def calculate_and_plot_histogram(self, channel, ax, color):
         if channel is not None:
@@ -75,54 +96,97 @@ class ImageWindow:
                 hist[value] = np.sum(channel == value)
             ax.bar(range(256), hist, color=color, alpha=0.6)
 
-    def calculate_lut_array(self, image):
-        lut_array = np.zeros(256, dtype=np.uint32)  # Utwórz tablicę LUT o rozmiarze 256 komórek
-        height, width = image.shape[:2]
+    def calculate_lut_arrays(self, image):
+        lut_arrays = {}
+        if len(image.shape) == 2 or (
+                len(image.shape) == 3 and np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(
+                image[:, :, 0], image[:, :, 2])):
+            lut_arrays['Monochromatyczny'] = self.calculate_lut_array(image)
+            for color in ['R', 'G', 'B']:
+                lut_arrays[color] = np.zeros(256, dtype=np.uint32)
+        elif len(image.shape) == 3:
+            gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            lut_arrays['Monochromatyczny'] = self.calculate_lut_array(gray_image)
+            for i, color in enumerate(['R', 'G', 'B']):
+                lut_arrays[color] = self.calculate_lut_array(image[:, :, 2-i])
+
+        return lut_arrays
+
+    def calculate_lut_array(self, channel):
+        lut_array = np.zeros(256, dtype=np.uint32)
+        height, width = channel.shape[:2]
         for i in range(height):
             for j in range(width):
-                pixel_value = image[i, j, 0]  # Zakładamy, że obraz jest w skali szarości
-                lut_array[pixel_value] += 1  # Zwiększ liczbę pikseli o wartości `pixel_value` o 1
+                pixel_value = channel[i, j]
+                lut_array[pixel_value] += 1
         return lut_array
 
-    def show_lut_table(self):
-        if self.lut_window is None:
-            self.lut_window = Toplevel()
-            self.lut_window.title("Tablica LUT")
-            self.lut_window.geometry("300x500")  # Ustaw rozmiar okna
-
-            lut_canvas = Canvas(self.lut_window)
-            lut_canvas.pack(fill=BOTH, expand=True)
-
-            scrollbar = Scrollbar(lut_canvas, orient="vertical", command=lut_canvas.yview)
-            scrollbar.pack(side="right", fill="y")
-            lut_canvas.configure(yscrollcommand=scrollbar.set)
-
-            lut_frame = Frame(lut_canvas)
-            lut_canvas.create_window((0, 0), window=lut_frame, anchor="nw")
-
-            for i in range(256):
-                Label(lut_frame, text=f"{i}", width=5, anchor="w").grid(row=i, column=0)
-                Label(lut_frame, text=f"{self.lut_array[i]}", width=10, anchor="w").grid(row=i, column=1)
-
-            lut_frame.update_idletasks()
-            lut_canvas.config(scrollregion=lut_canvas.bbox("all"))
+    def show_lut_tables(self):
+        if self.lut_window is None or not self.lut_window.winfo_exists():
+            self.lut_window = self.create_lut_window(self.lut_arrays)
         else:
-            self.lut_window.deiconify()  # Pokaż okno tablicy LUT
+            self.lut_window.deiconify()
+
+    def create_lut_window(self, lut_arrays):
+        lut_window = Toplevel()
+        lut_window.title(f"Tablica LUT - {self.top.title()}")
+        lut_window.geometry("955x270")
+
+        for name in ["Monochromatyczny", "R", "G", "B"]:
+            lut_array = lut_arrays[name]
+            lut_frame = Frame(lut_window)
+            lut_frame.grid(row=0, column=["Monochromatyczny", "R", "G", "B"].index(name), padx=10, pady=10)
+
+            Label(lut_frame, text=name + (" (Pusta)" if np.sum(lut_array) == 0 else "")).pack()
+
+            lut_canvas = Canvas(lut_frame)
+            lut_canvas.pack(fill='both', expand=True)
+
+            scrollbar = Scrollbar(lut_canvas, orient="vertical")
+            scrollbar.pack(side="right", fill="y")
+
+            lut_tree = ttk.Treeview(lut_canvas, columns=("Poziom jasności", "Liczba wystąpień"), show="headings")
+            lut_tree.heading("Poziom jasności", text="Poziom jasności")
+            lut_tree.heading("Liczba wystąpień", text="Liczba wystąpień")
+
+            lut_tree.column("Poziom jasności", width=100, anchor="center")
+            lut_tree.column("Liczba wystąpień", width=100, anchor="center")
+
+            lut_tree.pack(fill='both', expand=True)
+
+            lut_tree.config(yscrollcommand=scrollbar.set)
+            scrollbar.config(command=lut_tree.yview)
+
+            for j in range(256):
+                lut_tree.insert("", "end", values=(j, lut_array[j]))
+
+        return lut_window
 
     def save_image(self):
-        file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG files", "*.png"), ("JPEG files", "*.jpg"), ("All files", "*.*")])
+        file_path = filedialog.asksaveasfilename(defaultextension=".png",
+                                                 filetypes=[("PNG files", "*.png"), ("JPEG files", "*.jpg"),
+                                                            ("All files", "*.*")])
         if file_path:
             cv2.imwrite(file_path, self.image)
+
 
 class MainApp:
     def __init__(self, root):
         self.root = root
         root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        root.title("Fajna Apka")
+        root.geometry('300x70')
+
+        header_label = Label(root, text='Projekt Wykonał')
+        header_label.config(font=('Courier', 18))
+        header_label.pack()
+        name_label = Label(root, text='Łukasz Walicki')
+        name_label.config(font=('Courier', 18))
+        name_label.pack()
 
         menubar = Menu(root)
         root.config(menu=menubar)
 
-        # Dodawanie opcji do paska menu
         lab1_menu = Menu(menubar, tearoff=0)
         lab1_menu.add_command(label="Wczytaj obraz", command=self.load_image)
         menubar.add_cascade(label="Lab 1", menu=lab1_menu)
@@ -135,10 +199,20 @@ class MainApp:
     def on_closing(self):
         self.root.quit()
 
+
 def main():
     root = Tk()
     app = MainApp(root)
     root.mainloop()
 
+
 if __name__ == "__main__":
     main()
+
+# TODO Sprawdzić czy dla obrazu monochromatycznego,
+#  histogramy dla kanałów RGB powinny być puste, ponieważ w ImageJ te histogramy mają takie wartości jak monochromatyczny
+
+# TODO Sprawdzić w ImageJ czym różni się od siebie histogram Intensity (unweighted) od Intensity (weighted).
+#  Ponieważ dla obrazu kolorowego u mnie w polu monochromatycznym pojawiają się wartości zgodne z Intensity (weighted)
+
+# TODO Upewnić się czy histogram i tablica LUT są odpowiednio nazwane monochromatyczne czy jest to inna nazwa
