@@ -13,6 +13,7 @@ class ImageWindow:
         self.top = Toplevel(root)
         self.top.title(os.path.basename(image_path) + (" - Kopia" if is_copy else ""))
         self.image = cv2.imread(image_path)
+        self.is_monochrome = self.check_if_monochrome(self.image)  # Sprawdź, czy obraz jest monochromatyczny
         self.display_image()
         self.lut_window = None  # Okno tablicy LUT
         self.lut_arrays = self.calculate_lut_arrays(self.image)  # Oblicz tablice LUT
@@ -41,30 +42,34 @@ class ImageWindow:
     def show_histogram(self):
         histogram_window = Toplevel()
         histogram_window.title("Histogram - " + self.top.title())
-        fig, axs = plt.subplots(4, 1, figsize=(6, 8))  # Utwórz 4 subplots
+        num_histograms = 1 if self.is_monochrome else 5
+        fig, axs = plt.subplots(num_histograms, 1, figsize=(6, 10))  # Utwórz odpowiednią liczbę subplots
 
         image = self.image.copy()
 
-        if len(image.shape) == 2 or (
-                len(image.shape) == 3 and np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(
-            image[:, :, 0], image[:, :, 2])):
-            hist = self.calculate_and_plot_histogram(image, axs[0], 'gray')
-            axs[0].set_title('Intensity (weighted)')
-
+        if self.is_monochrome:
+            hist = self.calculate_and_plot_histogram(image, axs, 'gray')
+            axs.set_title('Intensity')
+            self.show_statistics(axs, hist, image)
         else:
             gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             hist = self.calculate_and_plot_histogram(gray_image, axs[0], 'gray')
             axs[0].set_title('Intensity (weighted)')
+            self.show_statistics(axs[0], hist, gray_image)
 
-        self.show_statistics(axs[0], hist, gray_image)
+            b, g, r = cv2.split(image)
+            unweighted_image = np.round((r.astype(np.uint32) + g.astype(np.uint32) + b.astype(np.uint32)) / 3).astype(np.uint8)
+            hist = self.calculate_and_plot_histogram(unweighted_image, axs[1], 'gray')
+            axs[1].set_title('Intensity (unweighted)')
+            self.show_statistics(axs[1], hist, unweighted_image)
 
-        colors = ('r', 'g', 'b')
-        for i, color in enumerate(colors):
-            hist = self.calculate_and_plot_histogram(image[:, :, 2 - i], axs[i + 1], color)
-            axs[i + 1].set_title(f'{color.upper()}')
-            self.show_statistics(axs[i + 1], hist, image[:, :, 2 - i])
+            colors = ('r', 'g', 'b')
+            for i, color in enumerate(colors):
+                hist = self.calculate_and_plot_histogram(image[:, :, 2 - i], axs[i + 2], color)
+                axs[i + 2].set_title(f'{color.upper()}')
+                self.show_statistics(axs[i + 2], hist, image[:, :, 2 - i])
 
-        for ax in axs:
+        for ax in (axs if isinstance(axs, np.ndarray) else [axs]):
             ax.set_xlabel("Wartość piksela")
             ax.set_ylabel("Liczba pikseli")
             ax.set_xlim([0, 256])
@@ -90,21 +95,20 @@ class ImageWindow:
                 median = np.median(channel)
                 min_val = np.min(channel)
                 max_val = np.max(channel)
-                mean_val = round(np.mean(channel), 3)
+                mean_val = round(np.mean(channel), 2)
                 std_dev = np.std(channel)
-                ax.text(1.05, 0.8, f'Mediana: {median:.2f}\nMin: {min_val}\nMax: {max_val}\nŚrednia: {mean_val}\nOdch. std.: {std_dev:.2f}', transform=ax.transAxes)
+                ax.text(1.05, 0.2, f'Mediana: {median:.2f}\nMin: {min_val}\nMax: {max_val}\nŚrednia: {mean_val}\nOdch. std.: {std_dev:.2f}', transform=ax.transAxes)
 
     def calculate_lut_arrays(self, image):
         lut_arrays = {}
-        if len(image.shape) == 2 or (
-                len(image.shape) == 3 and np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(
-                image[:, :, 0], image[:, :, 2])):
-            lut_arrays['Intensity (weighted)'] = self.calculate_lut_array(image)
-            for color in ['R', 'G', 'B']:
-                lut_arrays[color] = np.zeros(256, dtype=np.uint32)
-        elif len(image.shape) == 3:
+        if self.is_monochrome:
+            lut_arrays['Intensity'] = self.calculate_lut_array(image)
+        else:
             gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             lut_arrays['Intensity (weighted)'] = self.calculate_lut_array(gray_image)
+            b, g, r = cv2.split(image)
+            unweighted_image = np.round((r.astype(np.uint32) + g.astype(np.uint32) + b.astype(np.uint32)) / 3).astype(np.uint8)
+            lut_arrays['Intensity (unweighted)'] = self.calculate_lut_array(unweighted_image)
             for i, color in enumerate(['R', 'G', 'B']):
                 lut_arrays[color] = self.calculate_lut_array(image[:, :, 2-i])
 
@@ -130,10 +134,15 @@ class ImageWindow:
         lut_window.title(f"Tablica LUT - {self.top.title()}")
         lut_window.geometry("955x270")
 
-        for name in ["Intensity (weighted)", "R", "G", "B"]:
+        if self.is_monochrome:
+            names = ["Intensity"]
+        else:
+            names = ["Intensity (weighted)", "Intensity (unweighted)", "R", "G", "B"]
+
+        for name in names:
             lut_array = lut_arrays[name]
             lut_frame = Frame(lut_window)
-            lut_frame.grid(row=0, column=["Intensity (weighted)", "R", "G", "B"].index(name), padx=10, pady=10)
+            lut_frame.grid(row=0, column=names.index(name), padx=10, pady=10)
 
             Label(lut_frame, text=name + (" (Pusta)" if np.sum(lut_array) == 0 else "")).pack()
 
@@ -166,6 +175,13 @@ class ImageWindow:
                                                             ("All files", "*.*")])
         if file_path:
             cv2.imwrite(file_path, self.image)
+
+    def check_if_monochrome(self, image):
+        if len(image.shape) == 2:
+            return True
+        if len(image.shape) == 3 and np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(image[:, :, 0], image[:, :, 2]):
+            return True
+        return False
 
 
 class MainApp:
