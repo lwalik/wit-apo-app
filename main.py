@@ -203,9 +203,11 @@ class MainApp:
         menubar = Menu(root)
         root.config(menu=menubar)
 
-        lab1_menu = Menu(menubar, tearoff=0)
-        lab1_menu.add_command(label="Wczytaj obraz", command=self.load_image)
-        menubar.add_cascade(label="Lab 1", menu=lab1_menu)
+        lab2_menu = Menu(menubar, tearoff=0)
+        lab2_menu.add_command(label="Wczytaj obraz", command=self.load_image)
+        menubar.add_cascade(label="Lab 1", menu=lab2_menu)
+        lab2_menu = Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Lab 2", menu=lab2_menu)
 
     def load_image(self):
         file_path = filedialog.askopenfilename(title='Select Image')
