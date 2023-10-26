@@ -45,22 +45,24 @@ class ImageWindow:
 
         image = self.image.copy()
 
-
         if len(image.shape) == 2 or (
                 len(image.shape) == 3 and np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(
             image[:, :, 0], image[:, :, 2])):
-            self.calculate_and_plot_histogram(image, axs[0], 'gray')
+            hist = self.calculate_and_plot_histogram(image, axs[0], 'gray')
             axs[0].set_title('Intensity (weighted)')
 
         else:
             gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            self.calculate_and_plot_histogram(gray_image, axs[0], 'gray')
+            hist = self.calculate_and_plot_histogram(gray_image, axs[0], 'gray')
             axs[0].set_title('Intensity (weighted)')
+
+        self.show_statistics(axs[0], hist, gray_image)
 
         colors = ('r', 'g', 'b')
         for i, color in enumerate(colors):
-            self.calculate_and_plot_histogram(image[:, :, 2 - i], axs[i + 1], color)
+            hist = self.calculate_and_plot_histogram(image[:, :, 2 - i], axs[i + 1], color)
             axs[i + 1].set_title(f'{color.upper()}')
+            self.show_statistics(axs[i + 1], hist, image[:, :, 2 - i])
 
         for ax in axs:
             ax.set_xlabel("Wartość piksela")
@@ -78,6 +80,19 @@ class ImageWindow:
             for value in range(256):
                 hist[value] = np.sum(channel == value)
             ax.bar(range(256), hist, color=color, alpha=0.6)
+            return hist
+        return None
+
+    def show_statistics(self, ax, hist, channel):
+        if channel is not None:
+            non_zero_hist = hist[hist > 0]
+            if len(non_zero_hist) > 0:
+                median = np.median(channel)
+                min_val = np.min(channel)
+                max_val = np.max(channel)
+                mean_val = round(np.mean(channel), 3)
+                std_dev = np.std(channel)
+                ax.text(1.05, 0.8, f'Mediana: {median:.2f}\nMin: {min_val}\nMax: {max_val}\nŚrednia: {mean_val}\nOdch. std.: {std_dev:.2f}', transform=ax.transAxes)
 
     def calculate_lut_arrays(self, image):
         lut_arrays = {}
@@ -191,11 +206,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# TODO Sprawdzić czy dla obrazu monochromatycznego,
-#  histogramy dla kanałów RGB powinny być puste, ponieważ w ImageJ te histogramy mają takie wartości jak monochromatyczny
-
-# TODO Sprawdzić w ImageJ czym różni się od siebie histogram Intensity (unweighted) od Intensity (weighted).
-#  Ponieważ dla obrazu kolorowego u mnie w polu monochromatycznym pojawiają się wartości zgodne z Intensity (weighted)
-
-# TODO Upewnić się czy histogram i tablica LUT są odpowiednio nazwane monochromatyczne czy jest to inna nazwa
