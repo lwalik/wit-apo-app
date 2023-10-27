@@ -6,6 +6,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 from tkinter import filedialog, Label, Toplevel, Menu, Frame, Canvas, Scrollbar, ttk, Scale, Button
 
+
 class ImageWindow:
     def __init__(self, root, image_path, is_copy=False):
         self.top = Toplevel(root)
@@ -197,9 +198,16 @@ class ImageWindow:
             p2 = max_scale.get()
             q3 = new_min_scale.get()
             q4 = new_max_scale.get()
-            self.image = self.perform_linear_stretching(self.image, p1, p2, q3, q4)
+            self.image = perform_linear_stretching(self.image, p1, p2, q3, q4)
             self.display_image()
-            stretching_window.destroy()
+
+        def perform_linear_stretching(image, p1, p2, q3, q4):
+            result = np.copy(image)
+            mask = (image >= p1) & (image <= p2)
+            result[mask] = ((image[mask] - p1) * ((q4 - q3) / (p2 - p1)) + q3).astype(np.uint8)
+            result[image < p1] = q3
+            result[image > p2] = q4
+            return result
 
         stretching_window = Toplevel(self.top)
         stretching_window.title("Rozciąganie liniowe")
@@ -223,11 +231,3 @@ class ImageWindow:
 
         apply_button = Button(stretching_window, text="Zastosuj", command=apply_linear_stretching)
         apply_button.pack()
-
-    def perform_linear_stretching(self, image, p1, p2, q3, q4):
-        result = np.copy(image)
-        mask = (image >= p1) & (image <= p2)
-        result[mask] = ((image[mask] - p1) * ((q4 - q3) / (p2 - p1)) + q3).astype(np.uint8)
-        result[image < p1] = q3
-        result[image > p2] = q4
-        return result
