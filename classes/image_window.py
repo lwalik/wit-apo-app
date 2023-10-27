@@ -5,6 +5,7 @@ import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 from tkinter import filedialog, Label, Toplevel, Menu, Frame, Canvas, Scrollbar, ttk, Scale, Button
+from functions.custom_functions import calculate_histogram, check_if_monochrome, calculate_lut_arrays
 
 
 class ImageWindow:
@@ -12,7 +13,7 @@ class ImageWindow:
         self.top = Toplevel(root)
         self.top.title(os.path.basename(image_path) + (" - Kopia" if is_copy else ""))
         self.image = cv2.imread(image_path)
-        self.is_monochrome = self.check_if_monochrome(self.image)  # Sprawdź, czy obraz jest monochromatyczny
+        self.is_monochrome = check_if_monochrome(self.image)  # Sprawdź, czy obraz jest monochromatyczny
         self.label = None  # Dodajemy atrybut label
         self.display_image()
         self.lut_window = None  # Okno tablicy LUT
@@ -22,15 +23,18 @@ class ImageWindow:
         self.top.config(menu=menubar)
 
         # Dodawanie opcji do paska menu
-        plik_menu = Menu(menubar, tearoff=0)
-        plik_menu.add_command(label="Histogram", command=self.show_histogram)
-        plik_menu.add_command(label="Tablica LUT", command=self.show_lut_tables)
-        plik_menu.add_command(label="Duplikuj", command=lambda: ImageWindow(root, image_path, is_copy=True))
-        plik_menu.add_command(label="Zapisz", command=self.save_image)
-        plik_menu.add_command(label="Rozciąganie liniowe", command=self.linear_stretching)
-        plik_menu.add_command(label="Rozciąganie nieliniowe", command=self.gamma_stretching)
+        lab1_menu = Menu(menubar, tearoff=0)
+        lab1_menu.add_command(label="Histogram", command=self.show_histogram)
+        lab1_menu.add_command(label="Tablica LUT", command=self.show_lut_tables)
+        lab1_menu.add_command(label="Duplikuj", command=lambda: ImageWindow(root, image_path, is_copy=True))
+        lab1_menu.add_command(label="Zapisz", command=self.save_image)
+        lab2_menu = Menu(menubar, tearoff=0)
+        lab2_menu.add_command(label="Rozciąganie liniowe", command=self.linear_stretching)
+        lab2_menu.add_command(label="Rozciąganie nieliniowe", command=self.gamma_stretching)
+        lab2_menu.add_command(label="Wyrównanie histogramu", command=self.histogram_equalization)
 
-        menubar.add_cascade(label="Plik", menu=plik_menu)
+        menubar.add_cascade(label="Lab 1", menu=lab1_menu)
+        menubar.add_cascade(label="Lab 2", menu=lab2_menu)
 
     def display_image(self):
         b, g, r = cv2.split(self.image)
@@ -88,9 +92,7 @@ class ImageWindow:
 
     def calculate_and_plot_histogram(self, channel, ax, color):
         if channel is not None:
-            hist = np.zeros(256)
-            for value in range(256):
-                hist[value] = np.sum(channel == value)
+            hist = calculate_histogram(channel)
             ax.bar(range(256), hist, color=color, alpha=0.6)
             return hist
         return None
@@ -108,33 +110,8 @@ class ImageWindow:
                         f'Mediana: {median:.2f}\nMin: {min_val}\nMax: {max_val}\nŚrednia: {mean_val}\nOdch. std.: {std_dev:.2f}',
                         transform=ax.transAxes)
 
-    def calculate_lut_arrays(self, image):
-        lut_arrays = {}
-        if self.is_monochrome:
-            lut_arrays['Intensity'] = self.calculate_lut_array(image)
-        else:
-            gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            lut_arrays['Intensity (weighted)'] = self.calculate_lut_array(gray_image)
-            b, g, r = cv2.split(image)
-            unweighted_image = np.round((r.astype(np.uint32) + g.astype(np.uint32) + b.astype(np.uint32)) / 3).astype(
-                np.uint8)
-            lut_arrays['Intensity (unweighted)'] = self.calculate_lut_array(unweighted_image)
-            for i, color in enumerate(['R', 'G', 'B']):
-                lut_arrays[color] = self.calculate_lut_array(image[:, :, 2 - i])
-
-        return lut_arrays
-
-    def calculate_lut_array(self, channel):
-        lut_array = np.zeros(256, dtype=np.uint32)
-        height, width = channel.shape[:2]
-        for i in range(height):
-            for j in range(width):
-                pixel_value = channel[i, j]
-                lut_array[pixel_value] += 1
-        return lut_array
-
     def show_lut_tables(self):
-        self.lut_arrays = self.calculate_lut_arrays(self.image)
+        self.lut_arrays = calculate_lut_arrays(self.image, self.is_monochrome)
         self.lut_window = self.create_lut_window(self.lut_arrays)
 
     def create_lut_window(self, lut_arrays):
@@ -184,14 +161,6 @@ class ImageWindow:
                                                             ("All files", "*.*")])
         if file_path:
             cv2.imwrite(file_path, self.image)
-
-    def check_if_monochrome(self, image):
-        if len(image.shape) == 2:
-            return True
-        if len(image.shape) == 3 and np.array_equal(image[:, :, 0], image[:, :, 1]) and np.array_equal(
-                image[:, :, 0], image[:, :, 2]):
-            return True
-        return False
 
     def linear_stretching(self):
         def apply_linear_stretching():
@@ -283,3 +252,30 @@ class ImageWindow:
 
         apply_button = Button(gamma_window, text="Zastosuj", command=apply_gamma_stretching)
         apply_button.pack()
+
+    def histogram_equalization(self):
+
+        def equalize_histogram(image, histogram):
+            cdf = histogram.cumsum()
+            cdf_min = cdf.min()
+            cdf_max = cdf.max()
+            image_equalized = ((cdf[image] - cdf_min) / (cdf_max - cdf_min) * 255).astype(np.uint8)
+            return image_equalized
+
+        if self.is_monochrome:
+            gray_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+            histogram = calculate_histogram(gray_image)
+            equalized_image = equalize_histogram(gray_image, histogram)
+            self.image = cv2.merge([equalized_image] * 3)
+        else:
+            b, g, r = cv2.split(self.image)
+            b_histogram = calculate_histogram(b)
+            g_histogram = calculate_histogram(g)
+            r_histogram = calculate_histogram(r)
+            b_equalized = equalize_histogram(b, b_histogram)
+            g_equalized = equalize_histogram(g, g_histogram)
+            r_equalized = equalize_histogram(r, r_histogram)
+            self.image = cv2.merge([b_equalized, g_equalized, r_equalized])
+
+        self.display_image()
+
