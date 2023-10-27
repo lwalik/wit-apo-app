@@ -44,3 +44,8 @@ def calculate_lut_array(channel):
             lut_array[pixel_value] += 1
     return lut_array
 
+
+def update_scale(scale, value):
+    current_value = scale.get()
+    new_value = max(scale['from'], min(scale['to'], current_value + value))
+    scale.set(new_value)

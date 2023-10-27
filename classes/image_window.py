@@ -5,7 +5,7 @@ import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 from tkinter import filedialog, Label, Toplevel, Menu, Frame, Canvas, Scrollbar, ttk, Scale, Button, simpledialog
-from functions.custom_functions import calculate_histogram, check_if_monochrome, calculate_lut_arrays
+from functions.custom_functions import calculate_histogram, check_if_monochrome, calculate_lut_arrays, update_scale
 
 
 class ImageWindow:
@@ -203,23 +203,41 @@ class ImageWindow:
 
         stretching_window = Toplevel(self.top)
         stretching_window.title("Rozciąganie liniowe")
-        stretching_window.geometry('250x300')
+        stretching_window.geometry('300x300')
 
-        min_scale = Scale(stretching_window, from_=0, to=255, orient="horizontal", label="Minimum", width=10, length=200)
-        min_scale.pack()
+        min_scale_frame = Frame(stretching_window)
+        min_scale_frame.pack(pady=5)
+        Button(min_scale_frame, text="<", command=lambda: update_scale(min_scale, -1)).pack(side="left")
+        min_scale = Scale(min_scale_frame, from_=0, to=255, orient="horizontal", label="Minimum", width=10, length=200)
+        min_scale.pack(side="left", padx=5)
         min_scale.set(0)
+        Button(min_scale_frame, text=">", command=lambda: update_scale(min_scale, 1)).pack(side="left")
 
-        max_scale = Scale(stretching_window, from_=0, to=255, orient="horizontal", label="Maksimum", width=10, length=200)
-        max_scale.pack()
+        max_scale_frame = Frame(stretching_window)
+        max_scale_frame.pack(pady=5)
+        Button(max_scale_frame, text="<", command=lambda: update_scale(max_scale, -1)).pack(side="left")
+        max_scale = Scale(max_scale_frame, from_=0, to=255, orient="horizontal", label="Maksimum", width=10, length=200)
+        max_scale.pack(side="left", padx=5)
         max_scale.set(255)
+        Button(max_scale_frame, text=">", command=lambda: update_scale(max_scale, 1)).pack(side="left")
 
-        new_min_scale = Scale(stretching_window, from_=0, to=255, orient="horizontal", label="Nowe Minimum", width=10, length=200)
-        new_min_scale.pack()
+        new_min_scale_frame = Frame(stretching_window)
+        new_min_scale_frame.pack(pady=5)
+        Button(new_min_scale_frame, text="<", command=lambda: update_scale(new_min_scale, -1)).pack(side="left")
+        new_min_scale = Scale(new_min_scale_frame, from_=0, to=255, orient="horizontal", label="Nowe Minimum", width=10,
+                              length=200)
+        new_min_scale.pack(side="left", padx=5)
         new_min_scale.set(0)
+        Button(new_min_scale_frame, text=">", command=lambda: update_scale(new_min_scale, 1)).pack(side="left")
 
-        new_max_scale = Scale(stretching_window, from_=0, to=255, orient="horizontal", label="Nowe Maksimum", width=10, length=200)
-        new_max_scale.pack()
+        new_max_scale_frame = Frame(stretching_window)
+        new_max_scale_frame.pack(pady=5)
+        Button(new_max_scale_frame, text="<", command=lambda: update_scale(new_max_scale, -1)).pack(side="left")
+        new_max_scale = Scale(new_max_scale_frame, from_=0, to=255, orient="horizontal", label="Nowe Maksimum",
+                              width=10, length=200)
+        new_max_scale.pack(side="left", padx=5)
         new_max_scale.set(255)
+        Button(new_max_scale_frame, text=">", command=lambda: update_scale(new_max_scale, 1)).pack(side="left")
 
         apply_button = Button(stretching_window, text="Zastosuj", command=apply_linear_stretching)
         apply_button.pack()
@@ -253,17 +271,25 @@ class ImageWindow:
 
         gamma_window = Toplevel(self.top)
         gamma_window.title("Rozciąganie Gamma")
-        gamma_window.geometry('250x300')
+        gamma_window.geometry('300x180')
 
-        gamma_scale = Scale(gamma_window, from_=0.1, to=3.0, resolution=0.1, orient="horizontal", label="Gamma",
+        gamma_frame = Frame(gamma_window)
+        gamma_frame.pack(pady=5)
+        Button(gamma_frame, text="<", command=lambda: update_scale(gamma_scale, -0.1)).pack(side="left")
+        gamma_scale = Scale(gamma_frame, from_=0.1, to=3.0, resolution=0.1, orient="horizontal", label="Gamma",
                             width=10, length=200)
-        gamma_scale.pack()
+        gamma_scale.pack(side="left", padx=5)
         gamma_scale.set(1.0)
+        Button(gamma_frame, text=">", command=lambda: update_scale(gamma_scale, 0.1)).pack(side="left")
 
-        saturation_scale = Scale(gamma_window, from_=0, to=5, orient="horizontal", label="Przesycenie (%)",
+        saturation_frame = Frame(gamma_window)
+        saturation_frame.pack(pady=5)
+        Button(saturation_frame, text="<", command=lambda: update_scale(saturation_scale, -1)).pack(side="left")
+        saturation_scale = Scale(saturation_frame, from_=0, to=5, orient="horizontal", label="Przesycenie (%)",
                                  width=10, length=200)
-        saturation_scale.pack()
+        saturation_scale.pack(side="left", padx=5)
         saturation_scale.set(0)
+        Button(saturation_frame, text=">", command=lambda: update_scale(saturation_scale, 1)).pack(side="left")
 
         apply_button = Button(gamma_window, text="Zastosuj", command=apply_gamma_stretching)
         apply_button.pack()
