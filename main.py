@@ -13,9 +13,10 @@ class ImageWindow:
         self.top.title(os.path.basename(image_path) + (" - Kopia" if is_copy else ""))
         self.image = cv2.imread(image_path)
         self.is_monochrome = self.check_if_monochrome(self.image)  # Sprawdź, czy obraz jest monochromatyczny
+        self.label = None  # Dodajemy atrybut label
         self.display_image()
         self.lut_window = None  # Okno tablicy LUT
-        self.lut_arrays = self.calculate_lut_arrays(self.image)  # Oblicz tablice LUT
+        self.lut_arrays = None  # Oblicz tablice LUT
 
         menubar = Menu(self.top)
         self.top.config(menu=menubar)
@@ -35,9 +36,12 @@ class ImageWindow:
         img = cv2.merge((r, g, b))
         img = Image.fromarray(img)
         imgtk = ImageTk.PhotoImage(image=img)
-        label = Label(self.top, image=imgtk)
-        label.imgtk = imgtk  # Keep a reference to the image object to prevent garbage collection
-        label.pack()
+        if self.label is None:
+            self.label = Label(self.top, image=imgtk)
+            self.label.pack()
+        else:
+            self.label.configure(image=imgtk)
+        self.label.imgtk = imgtk  # Keep a reference to the image object to prevent garbage collection
 
     def show_histogram(self):
         histogram_window = Toplevel()
@@ -129,10 +133,12 @@ class ImageWindow:
         return lut_array
 
     def show_lut_tables(self):
-        if self.lut_window is None or not self.lut_window.winfo_exists():
-            self.lut_window = self.create_lut_window(self.lut_arrays)
-        else:
-            self.lut_window.deiconify()
+        self.lut_arrays = self.calculate_lut_arrays(self.image)
+        self.lut_window = self.create_lut_window(self.lut_arrays)
+        # if self.lut_window is None or not self.lut_window.winfo_exists():
+        #     self.lut_window = self.create_lut_window(self.lut_arrays)
+        # else:
+        #     self.lut_window.deiconify()
 
     def create_lut_window(self, lut_arrays):
         lut_window = Toplevel()
