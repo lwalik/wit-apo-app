@@ -4,7 +4,7 @@ import os
 import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
-from tkinter import filedialog, Label, Toplevel, Menu, Frame, Canvas, Scrollbar, ttk, Scale, Button
+from tkinter import filedialog, Label, Toplevel, Menu, Frame, Canvas, Scrollbar, ttk, Scale, Button, simpledialog
 from functions.custom_functions import calculate_histogram, check_if_monochrome, calculate_lut_arrays
 
 
@@ -30,9 +30,14 @@ class ImageWindow:
         lab1_menu.add_command(label="Zapisz", command=self.save_image)
         lab2_menu = Menu(menubar, tearoff=0)
         lab2_menu.add_cascade(label="Typ", menu=self.create_type_submenu(lab2_menu))
-        lab2_menu.add_command(label="Rozciąganie liniowe", command=self.linear_stretching)
+        lab2_menu.add_command(label="Rozciąganie liniowe", command=self.linear_histogram_stretching)
         lab2_menu.add_command(label="Rozciąganie nieliniowe", command=self.gamma_stretching)
         lab2_menu.add_command(label="Wyrównanie histogramu", command=self.histogram_equalization)
+        lab2_menu.add_command(label="Negacja", command=self.negation)
+        lab2_menu.add_command(label="Redukcja poziomów szarości", command=self.gray_level_reduction)
+        lab2_menu.add_command(label="Progowanie binarne", command=self.binary_thresholding)
+        lab2_menu.add_command(label="Progowanie z zachowaniem poziomów szarości", command=self.gray_level_thresholding)
+        lab2_menu.add_command(label="Rozciąganie liniowe z danymi użytkownika", command=self.linear_stretching)
 
         menubar.add_cascade(label="Lab 1", menu=lab1_menu)
         menubar.add_cascade(label="Lab 2", menu=lab2_menu)
@@ -297,4 +302,39 @@ class ImageWindow:
 
         self.image = converted_image
         self.is_monochrome = check_if_monochrome(self.image)
+        self.display_image()
+
+    def negation(self):
+        if not self.is_monochrome:
+            self.convert_to_grayscale(8)
+        self.image = 255 - self.image
+        self.display_image()
+
+    def gray_level_reduction(self):
+        levels = simpledialog.askinteger("Redukcja poziomów szarości", "Podaj liczbę poziomów szarości (1-256):",  minvalue=1, maxvalue=256)
+        if levels:
+            self.image = (self.image // (256 // levels) * (256 // levels)).astype(np.uint8)
+            self.display_image()
+
+    def binary_thresholding(self):
+        threshold = simpledialog.askinteger("Progowanie binarne", "Podaj próg (0-255):", minvalue=0, maxvalue=255)
+        if threshold is not None:
+            _, self.image = cv2.threshold(self.image, threshold, 255, cv2.THRESH_BINARY)
+            self.display_image()
+
+    def gray_level_thresholding(self):
+        threshold = simpledialog.askinteger("Progowanie z zachowaniem poziomów szarości", "Podaj próg (0-255):",
+                                            minvalue=0, maxvalue=255)
+        if threshold is not None:
+            self.image[self.image < threshold] = 0
+            self.display_image()
+
+    def linear_histogram_stretching(self):
+        if not self.is_monochrome:
+            self.convert_to_grayscale(8)
+        min_val = np.min(self.image)
+        max_val = np.max(self.image)
+        print('min_val: ', min_val, ' max_val: ', max_val)
+        if min_val != max_val:
+            self.image = ((self.image - min_val) / (max_val - min_val) * 255).astype(np.uint8)
         self.display_image()
