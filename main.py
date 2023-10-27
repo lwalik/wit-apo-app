@@ -135,10 +135,6 @@ class ImageWindow:
     def show_lut_tables(self):
         self.lut_arrays = self.calculate_lut_arrays(self.image)
         self.lut_window = self.create_lut_window(self.lut_arrays)
-        # if self.lut_window is None or not self.lut_window.winfo_exists():
-        #     self.lut_window = self.create_lut_window(self.lut_arrays)
-        # else:
-        #     self.lut_window.deiconify()
 
     def create_lut_window(self, lut_arrays):
         lut_window = Toplevel()
