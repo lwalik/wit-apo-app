@@ -29,6 +29,7 @@ class ImageWindow:
         lab1_menu.add_command(label="Duplikuj", command=lambda: ImageWindow(root, image_path, is_copy=True))
         lab1_menu.add_command(label="Zapisz", command=self.save_image)
         lab2_menu = Menu(menubar, tearoff=0)
+        lab2_menu.add_cascade(label="Typ", menu=self.create_type_submenu(lab2_menu))
         lab2_menu.add_command(label="Rozciąganie liniowe", command=self.linear_stretching)
         lab2_menu.add_command(label="Rozciąganie nieliniowe", command=self.gamma_stretching)
         lab2_menu.add_command(label="Wyrównanie histogramu", command=self.histogram_equalization)
@@ -36,10 +37,19 @@ class ImageWindow:
         menubar.add_cascade(label="Lab 1", menu=lab1_menu)
         menubar.add_cascade(label="Lab 2", menu=lab2_menu)
 
+    def create_type_submenu(self, parent_menu):
+        type_submenu = Menu(parent_menu, tearoff=0)
+        type_submenu.add_command(label="8-bit", command=lambda: self.convert_to_grayscale(8))
+        return type_submenu
+
+
     def display_image(self):
-        b, g, r = cv2.split(self.image)
-        img = cv2.merge((r, g, b))
-        img = Image.fromarray(img)
+        if len(self.image.shape) == 2:
+            img = Image.fromarray(self.image)
+        else:
+            b, g, r = cv2.split(self.image)
+            img = cv2.merge((r, g, b))
+            img = Image.fromarray(img)
         imgtk = ImageTk.PhotoImage(image=img)
         if self.label is None:
             self.label = Label(self.top, image=imgtk)
@@ -279,3 +289,12 @@ class ImageWindow:
 
         self.display_image()
 
+    def convert_to_grayscale(self, bit_depth):
+        if bit_depth == 8:
+            converted_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            raise ValueError("Nieobsługiwana głębia bitowa")
+
+        self.image = converted_image
+        self.is_monochrome = check_if_monochrome(self.image)
+        self.display_image()
