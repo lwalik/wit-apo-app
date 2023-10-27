@@ -28,6 +28,7 @@ class ImageWindow:
         plik_menu.add_command(label="Duplikuj", command=lambda: ImageWindow(root, image_path, is_copy=True))
         plik_menu.add_command(label="Zapisz", command=self.save_image)
         plik_menu.add_command(label="Rozciąganie liniowe", command=self.linear_stretching)
+        plik_menu.add_command(label="Rozciąganie nieliniowe", command=self.gamma_stretching)
 
         menubar.add_cascade(label="Plik", menu=plik_menu)
 
@@ -202,9 +203,16 @@ class ImageWindow:
             self.display_image()
 
         def perform_linear_stretching(image, p1, p2, q3, q4):
+            # Tworzenie kopii obrazu, aby nie modyfikować oryginalnego obrazu
             result = np.copy(image)
+            # Tworzenie maski logicznej dla pikseli, które znajdują się w zakresie [p1, p2]
+            # Piksele poza tym zakresem nie będą modyfikowane
             mask = (image >= p1) & (image <= p2)
+            # Stosowanie rozciągania liniowego dla pikseli w zakresie [p1, p2]
+            # Nowa wartość piksela = ((stara wartość piksela - p1) * ((q4 - q3) / (p2 - p1)) + q3)
+            # Wynik jest rzutowany na typ uint8, aby mieścił się w zakresie wartości pikseli obrazu
             result[mask] = ((image[mask] - p1) * ((q4 - q3) / (p2 - p1)) + q3).astype(np.uint8)
+            # Ustawienie wartości pikseli poniżej p1 na q3 oraz p2 na q4
             result[image < p1] = q3
             result[image > p2] = q4
             return result
@@ -230,4 +238,48 @@ class ImageWindow:
         new_max_scale.set(255)
 
         apply_button = Button(stretching_window, text="Zastosuj", command=apply_linear_stretching)
+        apply_button.pack()
+
+    def gamma_stretching(self):
+        def apply_gamma_stretching():
+            gamma = gamma_scale.get()
+            saturation = saturation_scale.get()
+            self.image = perform_gamma_stretching(self.image, gamma, saturation)
+            self.display_image()
+
+        def perform_gamma_stretching(image, gamma, saturation):
+            # Normalizacja obrazu do zakresu [0, 1]
+            image_normalized = image / 255.0
+            # Obliczanie procentu pikseli do przesycenia
+            pixels_to_saturate = int(image.size * saturation / 100)
+            # Sortowanie wartości pikseli
+            sorted_pixel_values = np.sort(image_normalized, axis=None)
+            # Znalezienie wartości progowych dla przesycenia
+            low_staturation_threshold = sorted_pixel_values[pixels_to_saturate]
+            high_staturation_threshold = sorted_pixel_values[-pixels_to_saturate - 1]
+            # Obcięcie wartości pikseli
+            image_clipped = np.clip(image_normalized, low_staturation_threshold, high_staturation_threshold)
+            # Normalizacja obrazu do zakresu [0, 1] po odcięciu
+            image_clipped = (image_clipped - low_staturation_threshold) / (high_staturation_threshold - low_staturation_threshold)
+            # Obliczenie transformacji gamma
+            image_gamma = np.power(image_clipped, gamma)
+            # # Skalowanie obrazu z powrotem do zakresu [0, 255]
+            image_gamma = np.clip(image_gamma * 255, 0, 255).astype(np.uint8)
+            return image_gamma
+
+        gamma_window = Toplevel(self.top)
+        gamma_window.title("Rozciąganie Gamma")
+        gamma_window.geometry('250x300')
+
+        gamma_scale = Scale(gamma_window, from_=0.1, to=3.0, resolution=0.1, orient="horizontal", label="Gamma",
+                            width=10, length=200)
+        gamma_scale.pack()
+        gamma_scale.set(1.0)
+
+        saturation_scale = Scale(gamma_window, from_=0, to=5, orient="horizontal", label="Przesycenie (%)",
+                                 width=10, length=200)
+        saturation_scale.pack()
+        saturation_scale.set(0)
+
+        apply_button = Button(gamma_window, text="Zastosuj", command=apply_gamma_stretching)
         apply_button.pack()
