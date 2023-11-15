@@ -412,7 +412,6 @@ class ImageWindow:
             result = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
 
             self.image = result
-            # TODO Check is_monochrome
             self.is_monochrome = check_if_monochrome(self.image)
             self.display_image()
 
@@ -429,7 +428,6 @@ class ImageWindow:
             # Konwersja obrazów na int16, aby zapobiec przepełnieniu
             self.image = np.clip(self.image.astype(np.int16) + image_to_add.astype(np.int16), 0, 255).astype(
                 np.uint8)
-            # TODO Check is_monochrome
             self.is_monochrome = check_if_monochrome(self.image)
             self.display_image()
             np.invert()
