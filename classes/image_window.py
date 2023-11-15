@@ -4,15 +4,15 @@ import os
 import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
-from tkinter import filedialog, Label, Toplevel, Menu, Frame, Canvas, Scrollbar, ttk, Scale, Button, simpledialog
+from tkinter import filedialog, Label, Toplevel, Menu, Frame, Canvas, Scrollbar, ttk, Scale, Button, simpledialog, messagebox
 from functions.custom_functions import calculate_histogram, check_if_monochrome, calculate_lut_arrays, update_scale
 
 
 class ImageWindow:
-    def __init__(self, root, image_path, is_copy=False):
+    def __init__(self, root, image_path, is_copy=False, image=None):
         self.top = Toplevel(root)
         self.top.title(os.path.basename(image_path) + (" - Kopia" if is_copy else ""))
-        self.image = cv2.imread(image_path)
+        self.image = image if is_copy else cv2.imread(image_path)
         self.is_monochrome = check_if_monochrome(self.image)  # Sprawdź, czy obraz jest monochromatyczny
         self.label = None  # Dodajemy atrybut label
         self.display_image()
@@ -26,8 +26,9 @@ class ImageWindow:
         lab1_menu = Menu(menubar, tearoff=0)
         lab1_menu.add_command(label="Histogram", command=self.show_histogram)
         lab1_menu.add_command(label="Tablica LUT", command=self.show_lut_tables)
-        lab1_menu.add_command(label="Duplikuj", command=lambda: ImageWindow(root, image_path, is_copy=True))
+        lab1_menu.add_command(label="Duplikuj", command=lambda: ImageWindow(root, image_path, is_copy=True, image=self.image))
         lab1_menu.add_command(label="Zapisz", command=self.save_image)
+
         lab2_menu = Menu(menubar, tearoff=0)
         lab2_menu.add_cascade(label="Typ", menu=self.create_type_submenu(lab2_menu))
         lab2_menu.add_command(label="Rozciąganie liniowe", command=self.linear_histogram_stretching)
@@ -39,12 +40,26 @@ class ImageWindow:
         lab2_menu.add_command(label="Progowanie z zachowaniem poziomów szarości", command=self.gray_level_thresholding)
         lab2_menu.add_command(label="Rozciąganie liniowe z danymi użytkownika", command=self.linear_stretching)
 
+        lab3_menu = Menu(menubar, tearoff=0)
+        lab3_menu.add_command(label="Dodaj obrazy z wysyceniem", command=self.add_images_with_saturation)
+        lab3_menu.add_command(label="Dodaj obrazy bez wysycenia", command=self.add_images_without_saturation)
+        lab3_menu.add_command(label="Dodaj obraz przez liczbę", command=self.add_image_with_number)
+        lab3_menu.add_command(label="Pomnóż obraz przez liczbę", command=self.multiply_image_with_number)
+        lab3_menu.add_command(label="Podziel obraz przez liczbę", command=self.divide_image_with_number)
+        lab3_menu.add_command(label="Różnica bezwzględna obrazów", command=self.absolute_difference)
+        lab3_menu.add_command(label="NOT", command=self.perform_not_operation)
+        lab3_menu.add_command(label="AND", command=self.perform_and_operation)
+        lab3_menu.add_command(label="OR", command=self.perform_or_operation)
+        lab3_menu.add_command(label="XOR", command=self.perform_xor_operation)
+
         menubar.add_cascade(label="Lab 1", menu=lab1_menu)
         menubar.add_cascade(label="Lab 2", menu=lab2_menu)
+        menubar.add_cascade(label="Lab 3", menu=lab3_menu)
 
     def create_type_submenu(self, parent_menu):
         type_submenu = Menu(parent_menu, tearoff=0)
-        type_submenu.add_command(label="8-bit", command=lambda: self.convert_to_grayscale(8))
+        type_submenu.add_command(label="8-bit", command=lambda: self.convert_to_grayscale())
+        type_submenu.add_command(label="Binary", command=lambda: self.convert_to_binary())
         return type_submenu
 
 
@@ -320,19 +335,35 @@ class ImageWindow:
 
         self.display_image()
 
-    def convert_to_grayscale(self, bit_depth):
-        if bit_depth == 8:
-            converted_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
-        else:
-            raise ValueError("Nieobsługiwana głębia bitowa")
+    def convert_to_grayscale(self):
+        # Sprawdź, czy obraz jest już w formacie 8-bitowym (odcienie szarości)
+        if len(self.image.shape) == 2 or (len(self.image.shape) == 3 and self.image.shape[2] == 1):
+            messagebox.showinfo("Informacja", "Obraz jest już w formacie 8-bitowym.")
+            return
+
+        # Konwersja obrazu na 8-bitowy format odcieni szarości
+        converted_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
 
         self.image = converted_image
-        self.is_monochrome = check_if_monochrome(self.image)
+        self.is_monochrome = True
+        self.display_image()
+
+    def convert_to_binary(self):
+        # Sprawdź, czy obraz jest już w formacie binarnym
+        if np.array_equal(self.image, self.image.astype(bool).astype(np.uint8) * 255):
+            messagebox.showinfo("Informacja", "Obraz jest już w formacie binarnym.")
+            return
+
+        # Użyj progowania, aby przekształcić obraz na format binarny
+        _, binary_image = cv2.threshold(self.image, 127, 255, cv2.THRESH_BINARY)
+
+        self.image = binary_image
+        self.is_monochrome = True
         self.display_image()
 
     def negation(self):
         if not self.is_monochrome:
-            self.convert_to_grayscale(8)
+            self.convert_to_grayscale()
         self.image = 255 - self.image
         self.display_image()
 
@@ -357,10 +388,126 @@ class ImageWindow:
 
     def linear_histogram_stretching(self):
         if not self.is_monochrome:
-            self.convert_to_grayscale(8)
+            self.convert_to_grayscale()
         min_val = np.min(self.image)
         max_val = np.max(self.image)
         print('min_val: ', min_val, ' max_val: ', max_val)
         if min_val != max_val:
             self.image = ((self.image - min_val) / (max_val - min_val) * 255).astype(np.uint8)
         self.display_image()
+
+    def add_images_with_saturation(self):
+        file_path = filedialog.askopenfilename(title='Wybierz obraz do dodania')
+        if file_path:
+            image_to_add = cv2.imread(file_path)
+            if image_to_add.shape != self.image.shape:
+                messagebox.showerror("Błąd", "Obrazy muszą mieć ten sam rozmiar i liczbę kanałów.")
+                return
+
+            # Dodawanie obrazów z przycinaniem wartości do maksymalnego zakresu
+            # Konwersja obrazów na int16, aby zapobiec przepełnieniu
+            result = np.clip(self.image.astype(np.int16) + image_to_add.astype(np.int16), 0, 255).astype(np.uint8)
+
+            # Opcjonalnie: konwersja wyniku na odcienie szarości
+            result = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
+
+            self.image = result
+            # TODO Check is_monochrome
+            self.is_monochrome = check_if_monochrome(self.image)
+            self.display_image()
+
+
+    def add_images_without_saturation(self):
+        file_path = filedialog.askopenfilename(title='Wybierz obraz do dodania')
+        if file_path:
+            image_to_add = cv2.imread(file_path)
+            if image_to_add.shape != self.image.shape:
+                messagebox.showerror("Błąd", "Obrazy muszą mieć ten sam rozmiar i liczbę kanałów.")
+                return
+
+            # Dodawanie obrazów z przycinaniem wartości do maksymalnego zakresu
+            # Konwersja obrazów na int16, aby zapobiec przepełnieniu
+            self.image = np.clip(self.image.astype(np.int16) + image_to_add.astype(np.int16), 0, 255).astype(
+                np.uint8)
+            # TODO Check is_monochrome
+            self.is_monochrome = check_if_monochrome(self.image)
+            self.display_image()
+            np.invert()
+
+    def add_image_with_number(self):
+        number = simpledialog.askfloat("Dodawanie obrazu przez liczbę", "Podaj liczbę:", minvalue=0)
+        self.is_monochrome = check_if_monochrome(self.image)
+        if number is not None:
+            # Sprawdzenie, czy obraz jest monochromatyczny
+            if self.is_monochrome:
+                self.image = np.clip(self.image.astype(np.int16) + number, 0, 255).astype(np.uint8)
+            else:
+                # Konwersja każdego kanału koloru oddzielnie
+                for i in range(3):
+                    self.image[:, :, i] = np.clip(self.image[:, :, i].astype(np.int16) + number, 0, 255).astype(
+                        np.uint8)
+
+            self.display_image()
+
+    def multiply_image_with_number(self):
+        number = simpledialog.askfloat("Mnożenie obrazu przez liczbę", "Podaj liczbę:", minvalue=0)
+        self.is_monochrome = check_if_monochrome(self.image)
+        if number is not None:
+            if self.is_monochrome:
+                self.image = np.clip(self.image.astype(np.int16) * number, 0, 255).astype(np.uint8)
+            else:
+                # Konwersja każdego kanału koloru oddzielnie
+                for i in range(3):
+                    self.image[:, :, i] = np.clip(self.image[:, :, i].astype(np.int16) * number, 0, 255).astype(
+                        np.uint8)
+
+            self.display_image()
+
+    def divide_image_with_number(self):
+        number = simpledialog.askfloat("Dzielenie obrazu przez liczbę", "Podaj liczbę:", minvalue=1)
+        self.is_monochrome = check_if_monochrome(self.image)
+        if number is not None:
+            if self.is_monochrome:
+                self.image = np.clip(self.image.astype(np.int16) // number, 0, 255).astype(np.uint8)
+            else:
+                # Konwersja każdego kanału koloru oddzielnie
+                for i in range(3):
+                    self.image[:, :, i] = np.clip(self.image[:, :, i].astype(np.int16) // number, 0, 255).astype(
+                        np.uint8)
+
+            self.display_image()
+
+    def absolute_difference(self):
+        file_path = filedialog.askopenfilename(title='Wybierz obraz do różnicy bezwzględnej')
+        if file_path:
+            image_to_subtract = cv2.imread(file_path)
+            if image_to_subtract.shape != self.image.shape:
+                messagebox.showerror("Błąd", "Obrazy muszą mieć ten sam rozmiar i liczbę kanałów.")
+                return
+            self.image = np.abs(self.image.astype(int) - image_to_subtract.astype(int)).astype(np.uint8)
+            self.display_image()
+
+    def perform_not_operation(self):
+        self.image = np.invert(self.image)
+        self.display_image()
+
+    def perform_and_operation(self):
+        second_image_path = filedialog.askopenfilename(title='Wybierz drugi obraz')
+        if second_image_path:
+            second_image = cv2.imread(second_image_path)
+            self.image = np.bitwise_and(self.image, second_image)
+            self.display_image()
+
+    def perform_or_operation(self):
+        second_image_path = filedialog.askopenfilename(title='Wybierz drugi obraz')
+        if second_image_path:
+            second_image = cv2.imread(second_image_path)
+            self.image = np.bitwise_or(self.image, second_image)
+            self.display_image()
+
+    def perform_xor_operation(self):
+        second_image_path = filedialog.askopenfilename(title='Wybierz drugi obraz')
+        if second_image_path:
+            second_image = cv2.imread(second_image_path)
+            self.image = np.bitwise_xor(self.image, second_image)
+            self.display_image()
