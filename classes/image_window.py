@@ -12,7 +12,7 @@ class ImageWindow:
     def __init__(self, root, image_path, is_copy=False, image=None):
         self.top = Toplevel(root)
         self.top.title(os.path.basename(image_path) + (" - Kopia" if is_copy else ""))
-        self.image = image if is_copy else cv2.imread(image_path)
+        self.image = image if is_copy and image is not None else cv2.imread(image_path)
         self.is_monochrome = check_if_monochrome(self.image)  # Sprawdź, czy obraz jest monochromatyczny
         self.label = None  # Dodajemy atrybut label
         self.display_image()
