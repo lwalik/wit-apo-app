@@ -4,7 +4,8 @@ import os
 import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
-from tkinter import filedialog, Label, Toplevel, Menu, Frame, Canvas, Scrollbar, ttk, Scale, Button, simpledialog, messagebox
+from tkinter import filedialog, Label, Toplevel, Menu, Frame, Canvas, Scrollbar, ttk, Scale, Button, simpledialog, \
+    messagebox, OptionMenu, StringVar, Radiobutton, IntVar
 from functions.custom_functions import calculate_histogram, check_if_monochrome, calculate_lut_arrays, update_scale
 
 
@@ -26,7 +27,8 @@ class ImageWindow:
         lab1_menu = Menu(menubar, tearoff=0)
         lab1_menu.add_command(label="Histogram", command=self.show_histogram)
         lab1_menu.add_command(label="Tablica LUT", command=self.show_lut_tables)
-        lab1_menu.add_command(label="Duplikuj", command=lambda: ImageWindow(root, image_path, is_copy=True, image=self.image))
+        lab1_menu.add_command(label="Duplikuj",
+                              command=lambda: ImageWindow(root, image_path, is_copy=True, image=self.image))
         lab1_menu.add_command(label="Zapisz", command=self.save_image)
 
         lab2_menu = Menu(menubar, tearoff=0)
@@ -52,16 +54,27 @@ class ImageWindow:
         lab3_menu.add_command(label="OR", command=self.perform_or_operation)
         lab3_menu.add_command(label="XOR", command=self.perform_xor_operation)
 
+        lab4_menu = Menu(menubar, tearoff=0)
+        lab4_menu.add_command(label="Uśrednianie", command=lambda: self.apply_smoothing_with_border_options("average"))
+        lab4_menu.add_command(label="Uśrednianie z wagami",
+                              command=lambda: self.apply_smoothing_with_border_options("weighted"))
+        lab4_menu.add_command(label="Filtr Gaussa",
+                              command=lambda: self.apply_smoothing_with_border_options("gaussian"))
+        lab4_menu.add_command(label="Wostrzanie liniowe", command=lambda: self.linear_sharpening())
+        lab4_menu.add_command(label="Kierunkowa detekcja krawędzi", command=self.sobel_edge_detection_menu)
+        lab4_menu.add_command(label="Detekcja krawędzi", command=self.edge_detection_menu)
+        lab4_menu.add_command(label="Operacja Medianowa", command=self.median_operation)
+
         menubar.add_cascade(label="Lab 1", menu=lab1_menu)
         menubar.add_cascade(label="Lab 2", menu=lab2_menu)
         menubar.add_cascade(label="Lab 3", menu=lab3_menu)
+        menubar.add_cascade(label="Lab 4", menu=lab4_menu)
 
     def create_type_submenu(self, parent_menu):
         type_submenu = Menu(parent_menu, tearoff=0)
         type_submenu.add_command(label="8-bit", command=lambda: self.convert_to_grayscale())
         type_submenu.add_command(label="Binary", command=lambda: self.convert_to_binary())
         return type_submenu
-
 
     def display_image(self):
         if len(self.image.shape) == 2:
@@ -277,7 +290,8 @@ class ImageWindow:
             # Obcięcie wartości pikseli
             image_clipped = np.clip(image_normalized, low_staturation_threshold, high_staturation_threshold)
             # Normalizacja obrazu do zakresu [0, 1] po odcięciu
-            image_clipped = (image_clipped - low_staturation_threshold) / (high_staturation_threshold - low_staturation_threshold)
+            image_clipped = (image_clipped - low_staturation_threshold) / (
+                        high_staturation_threshold - low_staturation_threshold)
             # Obliczenie transformacji gamma
             image_gamma = np.power(image_clipped, gamma)
             # # Skalowanie obrazu z powrotem do zakresu [0, 255]
@@ -368,7 +382,8 @@ class ImageWindow:
         self.display_image()
 
     def gray_level_reduction(self):
-        levels = simpledialog.askinteger("Redukcja poziomów szarości", "Podaj liczbę poziomów szarości (1-256):",  minvalue=1, maxvalue=256)
+        levels = simpledialog.askinteger("Redukcja poziomów szarości", "Podaj liczbę poziomów szarości (1-256):",
+                                         minvalue=1, maxvalue=256)
         if levels:
             self.image = (self.image // (256 // levels) * (256 // levels)).astype(np.uint8)
             self.display_image()
@@ -414,7 +429,6 @@ class ImageWindow:
             self.image = result
             self.is_monochrome = check_if_monochrome(self.image)
             self.display_image()
-
 
     def add_images_without_saturation(self):
         file_path = filedialog.askopenfilename(title='Wybierz obraz do dodania')
@@ -509,3 +523,247 @@ class ImageWindow:
             second_image = cv2.imread(second_image_path)
             self.image = np.bitwise_xor(self.image, second_image)
             self.display_image()
+
+    def apply_smoothing_with_border_options(self, method):
+        def on_apply():
+            border_option = selected_border_type.get()
+            self.apply_smoothing(method, border_option)
+
+        border_window = Toplevel(self.top)
+        border_window.title("Ustawienia brzegów")
+        border_window.geometry('300x200')
+
+        border_label = Label(border_window, text="Wybierz typ obsługi brzegów:")
+        border_label.pack()
+
+        selected_border_type = StringVar(value="BORDER_CONSTANT")
+
+
+        # for border_type in border_types:
+        Radiobutton(border_window, text="BORDER_CONSTANT", variable=selected_border_type, value=cv2.BORDER_CONSTANT).pack()
+        Radiobutton(border_window, text="BORDER_REFLECT", variable=selected_border_type, value=cv2.BORDER_REFLECT).pack()
+        Radiobutton(border_window, text="BORDER_WRAP", variable=selected_border_type, value=cv2.BORDER_WRAP).pack()
+
+        apply_button = Button(border_window, text="Zastosuj", command=on_apply)
+        apply_button.pack(pady=10)
+
+    def apply_smoothing(self, method, border_option):
+        if method == "average":
+            kernel = np.ones((3, 3), np.float32) / 9
+        elif method == "weighted":
+            kernel = np.array([[1, 2, 1], [2, 4, 2], [1, 2, 1]], np.float32) / 16
+        elif method == "gaussian":
+            kernel = cv2.getGaussianKernel(3, 0) * cv2.getGaussianKernel(3, 0).T
+        else:
+            raise ValueError("Nieprawidłowa metoda wygładzania.")
+
+        # border_type = self.convertBorderOptionToType(border_option)
+        print('Tutaj border type: ', border_option)
+
+        self.image = self.apply_border(self.image, border_option)
+
+        smoothed_image = cv2.filter2D(self.image, -1, kernel)
+        self.image = smoothed_image.astype(np.uint8)
+        self.display_image()
+
+    def linear_sharpening(self):
+        def apply_linear_sharpening(mask, border_option):
+            self.image = self.convolve_image(mask, border_option)
+            self.display_image()
+
+        sharpening_window = Toplevel(self.top)
+        sharpening_window.title("Wyostrzanie liniowe")
+        sharpening_window.geometry('350x200')
+
+        mask_selection_frame = Frame(sharpening_window)
+        mask_selection_frame.pack(pady=5)
+
+        mask_label = Label(mask_selection_frame, text="Wybierz maskę laplasjanową:")
+        mask_label.pack()
+
+        masks = {
+            "Maska 1": np.array([[0, -1, 0], [-1, 4, -1], [0, -1, 0]]),
+            "Maska 2": np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]]),
+            "Maska 3": np.array([[1, -2, 1], [-2, 4, -2], [1, -2, 1]])
+        }
+
+        selected_mask = StringVar()
+        selected_mask.set("Maska 1")
+
+        mask_option_menu = OptionMenu(mask_selection_frame, selected_mask, *masks.keys())
+        mask_option_menu.pack()
+
+
+        selected_border = StringVar()
+        selected_border.set("BORDER_CONSTANT")
+
+        Radiobutton(sharpening_window, text="BORDER_CONSTANT", variable=selected_border,
+                    value=cv2.BORDER_CONSTANT).pack()
+        Radiobutton(sharpening_window, text="BORDER_REFLECT", variable=selected_border,
+                    value=cv2.BORDER_REFLECT).pack()
+        Radiobutton(sharpening_window, text="BORDER_WRAP", variable=selected_border, value=cv2.BORDER_WRAP).pack()
+
+        apply_button = Button(sharpening_window, text="Zastosuj",
+                              command=lambda: apply_linear_sharpening(masks[selected_mask.get()],
+                                                                      selected_border.get()))
+        apply_button.pack()
+
+    def convolve_image(self, kernel, border_option):
+        self.image = self.apply_border(self.image, border_option)
+        return cv2.filter2D(self.image, -1, kernel)
+
+    # Kierunkowa detekcja krawędzi
+    def sobel_edge_detection(self, mask, border_option):
+        self.image = self.apply_border(self.image, border_option)
+        edges = cv2.filter2D(self.image, -1, mask)
+        self.image = cv2.convertScaleAbs(edges)
+        self.display_image()
+
+    #
+    def sobel_edge_detection_menu(self):
+        sobel_window = Toplevel(self.top)
+        sobel_window.title("Detekcja krawędzi Sobela")
+        sobel_window.geometry('350x200')
+
+        mask_selection_frame = Frame(sobel_window)
+        mask_selection_frame.pack(pady=5)
+
+        mask_label = Label(mask_selection_frame, text="Wybierz maskę Sobela:")
+        mask_label.pack()
+
+        masks = {
+            "Pionowa (Vertical)": np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]),
+            "Pozioma (Horizontal)": np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]),
+            "Przekątna Górna-Lewa": np.array([[0, 1, 2], [-1, 0, 1], [-2, -1, 0]]),
+            "Przekątna Górna-Prawa": np.array([[2, 1, 0], [1, 0, -1], [0, -1, -2]]),
+            "Przekątna Dolna-Lewa": np.array([[-2, -1, 0], [-1, 0, 1], [0, 1, 2]]),
+            "Przekątna Dolna-Prawa": np.array([[0, -1, -2], [1, 0, -1], [2, 1, 0]]),
+            "Horyzontalna + Pionowa": np.array([[-2, 0, 2], [-2, 0, 2], [-2, 0, 2]]) + np.array(
+                [[-1, -1, -1], [0, 0, 0], [1, 1, 1]]),
+            "Pionowa - Pozioma": np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]) - np.array(
+                [[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
+        }
+
+        selected_mask = StringVar()
+        selected_mask.set("Pionowa (Vertical)")
+
+        mask_option_menu = OptionMenu(mask_selection_frame, selected_mask, *masks.keys())
+        mask_option_menu.pack()
+
+        # Opcje marginesów/brzegów
+
+        selected_border = StringVar()
+        selected_border.set("BORDER_CONSTANT")
+
+        Radiobutton(sobel_window, text="BORDER_CONSTANT", variable=selected_border,
+                    value=cv2.BORDER_CONSTANT).pack()
+        Radiobutton(sobel_window, text="BORDER_REFLECT", variable=selected_border,
+                    value=cv2.BORDER_REFLECT).pack()
+        Radiobutton(sobel_window, text="BORDER_WRAP", variable=selected_border, value=cv2.BORDER_WRAP).pack()
+
+        apply_button = Button(sobel_window, text="Zastosuj",
+                              command=lambda: self.sobel_edge_detection(masks[selected_mask.get()],
+                                                                        selected_border.get()))
+        apply_button.pack()
+
+    def edge_detection_menu(self):
+        edge_detection_window = Toplevel(self.top)
+        edge_detection_window.title("Detekcja krawędzi")
+        edge_detection_window.geometry('350x200')
+
+        mask_selection_frame = Frame(edge_detection_window)
+        mask_selection_frame.pack(pady=5)
+
+        mask_label = Label(mask_selection_frame, text="Wybierz maskę:")
+        mask_label.pack()
+
+        masks = {
+            "Prewitt_X": cv2.getDerivKernels(1, 0, 3, normalize=True),
+            "Prewitt_Y": cv2.getDerivKernels(0, 1, 3, normalize=True),
+            "Sobel_X": np.array([[1, 0, -1], [2, 0, -2], [1, 0, -1]]),
+            "Sobel_Y": np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]]),
+        }
+
+        selected_mask = StringVar()
+        selected_mask.set("Prewitt_X")
+
+        mask_option_menu = OptionMenu(mask_selection_frame, selected_mask, *masks.keys())
+        mask_option_menu.pack()
+
+        # Opcje marginesów/brzegów
+
+        selected_border = StringVar()
+        selected_border.set("BORDER_CONSTANT")
+
+
+        Radiobutton(edge_detection_window, text="BORDER_CONSTANT", variable=selected_border,
+                    value=cv2.BORDER_CONSTANT).pack()
+        Radiobutton(edge_detection_window, text="BORDER_REFLECT", variable=selected_border,
+                    value=cv2.BORDER_REFLECT).pack()
+        Radiobutton(edge_detection_window, text="BORDER_WRAP", variable=selected_border, value=cv2.BORDER_WRAP).pack()
+
+        apply_button = Button(edge_detection_window, text="Zastosuj",
+                              command=lambda: self.apply_edge_detection(masks[selected_mask.get()],
+                                                                        selected_border.get()))
+        apply_button.pack()
+
+    def apply_edge_detection(self, kernel, border_option):
+        if isinstance(kernel, tuple):
+            kernel = np.outer(kernel[0], kernel[1])
+
+        self.image = self.apply_border(self.image, border_option)
+        edges = cv2.filter2D(self.image, cv2.CV_64F, kernel)
+        edges = cv2.convertScaleAbs(edges)
+
+        self.image = edges
+        self.display_image()
+
+    def apply_border(self, image, border_mode):
+        border_type = int(border_mode)
+        border_size = 1
+        return cv2.copyMakeBorder(image, border_size, border_size, border_size, border_size,
+                                  borderType=border_type)
+
+    def median_operation(self):
+        # Utwórz nowe okno dla operacji medianowej
+        median_window = Toplevel(self.top)
+        median_window.title("Operacja medianowa")
+        median_window.geometry('300x150')
+
+        # Wybór rozmiaru maski
+        mask_size_var = IntVar(value=3)
+        mask_size_label = Label(median_window, text="Wybierz rozmiar maski:")
+        mask_size_label.pack()
+
+        mask_size_scale = Scale(median_window, from_=3, to=9, orient="horizontal", variable=mask_size_var)
+        mask_size_scale.pack()
+
+        selected_border = StringVar()
+        selected_border.set("BORDER_CONSTANT")
+
+        Radiobutton(median_window, text="BORDER_CONSTANT", variable=selected_border,
+                    value=cv2.BORDER_CONSTANT).pack()
+        Radiobutton(median_window, text="BORDER_REFLECT", variable=selected_border,
+                    value=cv2.BORDER_REFLECT).pack()
+        Radiobutton(median_window, text="BORDER_WRAP", variable=selected_border, value=cv2.BORDER_WRAP).pack()
+
+        # Przycisk potwierdzający wybór
+        confirm_button = Button(median_window, text="Potwierdź",
+                                command=lambda: self.apply_median_operation(mask_size_var.get(), selected_border.get()))
+        confirm_button.pack()
+
+    def apply_median_operation(self, mask_size, border_option):
+        # Sprawdź czy maska ma nieparzysty rozmiar
+        if mask_size % 2 == 0:
+            messagebox.showerror("Błąd", "Rozmiar maski musi być liczbą nieparzystą.")
+            return
+
+        # Przygotowanie obrazu
+        padded_image = self.apply_border(self.image, border_option)
+
+        # Wykonanie operacji medianowej
+        median_result = cv2.medianBlur(padded_image, mask_size)
+
+        # Aktualizacja obrazu i wyświetlenie go
+        self.image = median_result
+        self.display_image()
