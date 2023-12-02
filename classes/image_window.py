@@ -5,7 +5,7 @@ import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 from tkinter import filedialog, Label, Toplevel, Menu, Frame, Canvas, Scrollbar, ttk, Scale, Button, simpledialog, \
-    messagebox, OptionMenu, StringVar, Radiobutton, IntVar
+    messagebox, OptionMenu, StringVar, Radiobutton, IntVar, HORIZONTAL
 from functions.custom_functions import calculate_histogram, check_if_monochrome, calculate_lut_arrays, update_scale
 
 
@@ -65,10 +65,14 @@ class ImageWindow:
         lab4_menu.add_command(label="Detekcja krawędzi", command=self.edge_detection_menu)
         lab4_menu.add_command(label="Operacja Medianowa", command=self.median_operation)
 
+        lab5_menu = Menu(menubar, tearoff=0)
+        lab5_menu.add_command(label="Detekcja krawędzi (Canny)", command=self.canny_edge_detection_menu)
+
         menubar.add_cascade(label="Lab 1", menu=lab1_menu)
         menubar.add_cascade(label="Lab 2", menu=lab2_menu)
         menubar.add_cascade(label="Lab 3", menu=lab3_menu)
         menubar.add_cascade(label="Lab 4", menu=lab4_menu)
+        menubar.add_cascade(label="Lab 5", menu=lab5_menu)
 
     def create_type_submenu(self, parent_menu):
         type_submenu = Menu(parent_menu, tearoff=0)
@@ -77,6 +81,7 @@ class ImageWindow:
         return type_submenu
 
     def display_image(self):
+        self.is_monochrome = check_if_monochrome(self.image)
         if len(self.image.shape) == 2:
             img = Image.fromarray(self.image)
         else:
@@ -708,14 +713,20 @@ class ImageWindow:
         apply_button.pack()
 
     def apply_edge_detection(self, kernel, border_option):
+        if len(self.image.shape) == 3:
+            gray_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray_image = self.image
+
         if isinstance(kernel, tuple):
             kernel = np.outer(kernel[0], kernel[1])
 
-        self.image = self.apply_border(self.image, border_option)
+        self.image = self.apply_border(gray_image, border_option)
         edges = cv2.filter2D(self.image, cv2.CV_64F, kernel)
         edges = cv2.convertScaleAbs(edges)
 
         self.image = edges
+        self.is_monochrome = check_if_monochrome(self.image)
         self.display_image()
 
     def apply_border(self, image, border_mode):
@@ -766,4 +777,39 @@ class ImageWindow:
 
         # Aktualizacja obrazu i wyświetlenie go
         self.image = median_result
+        self.display_image()
+
+    def canny_edge_detection_menu(self):
+        canny_window = Toplevel(self.top)
+        canny_window.title("Detekcja krawędzi Canny")
+        canny_window.geometry('300x300')
+
+        Label(canny_window, text="Progi detekcji krawędzi").pack(pady=10)
+
+        # Prog dolny
+        Label(canny_window, text="Dolny próg:").pack()
+        lower_threshold = Scale(canny_window, from_=0, to=255, orient=HORIZONTAL)
+        lower_threshold.set(50)
+        lower_threshold.pack()
+
+        # Prog górny
+        Label(canny_window, text="Górny próg:").pack()
+        upper_threshold = Scale(canny_window, from_=0, to=255, orient=HORIZONTAL)
+        upper_threshold.set(150)
+        upper_threshold.pack()
+
+        apply_button = Button(canny_window, text="Zastosuj",
+                              command=lambda: self.apply_canny_edge_detection(lower_threshold.get(),
+                                                                              upper_threshold.get()))
+        apply_button.pack(pady=10)
+
+    def apply_canny_edge_detection(self, lower_threshold, upper_threshold):
+        if len(self.image.shape) == 3:
+            gray_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray_image = self.image
+
+        edges = cv2.Canny(gray_image, lower_threshold, upper_threshold)
+        self.image = edges
+        self.is_monochrome = check_if_monochrome(self.image)
         self.display_image()
