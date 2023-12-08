@@ -5,7 +5,7 @@ import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 from tkinter import filedialog, Label, Toplevel, Menu, Frame, Canvas, Scrollbar, ttk, Scale, Button, simpledialog, \
-    messagebox, OptionMenu, StringVar, Radiobutton, IntVar, HORIZONTAL
+    messagebox, OptionMenu, StringVar, Radiobutton, IntVar, HORIZONTAL, Entry
 from functions.custom_functions import calculate_histogram, check_if_monochrome, calculate_lut_arrays, update_scale
 
 
@@ -67,6 +67,9 @@ class ImageWindow:
 
         lab5_menu = Menu(menubar, tearoff=0)
         lab5_menu.add_command(label="Detekcja krawędzi (Canny)", command=self.canny_edge_detection_menu)
+        lab5_menu.add_command(label="Progowanie z dwoma progami", command=self.apply_double_threshold)
+        lab5_menu.add_command(label="Progowanie metodą Otsu", command=self.apply_otsu_threshold)
+        lab5_menu.add_command(label="Progowanie adaptacyjne", command=self.apply_adaptive_threshold)
 
         menubar.add_cascade(label="Lab 1", menu=lab1_menu)
         menubar.add_cascade(label="Lab 2", menu=lab2_menu)
@@ -532,7 +535,7 @@ class ImageWindow:
     def apply_smoothing_with_border_options(self, method):
         def on_apply():
             border_option = selected_border_type.get()
-            self.apply_smoothing(method, border_option)
+            self.apply_smoothing(method, border_option, kernel_val.get())
 
         border_window = Toplevel(self.top)
         border_window.title("Ustawienia brzegów")
@@ -543,27 +546,31 @@ class ImageWindow:
 
         selected_border_type = StringVar(value="BORDER_CONSTANT")
 
-
         # for border_type in border_types:
         Radiobutton(border_window, text="BORDER_CONSTANT", variable=selected_border_type, value=cv2.BORDER_CONSTANT).pack()
         Radiobutton(border_window, text="BORDER_REFLECT", variable=selected_border_type, value=cv2.BORDER_REFLECT).pack()
         Radiobutton(border_window, text="BORDER_WRAP", variable=selected_border_type, value=cv2.BORDER_WRAP).pack()
 
+        kernel_val = IntVar()
+        kernel_val_label = Label(border_window, text="Podaj Wartość:")
+        kernel_val_label.pack()
+        kernel_input = Entry(border_window, textvariable=kernel_val)
+        kernel_input.pack()
+
         apply_button = Button(border_window, text="Zastosuj", command=on_apply)
         apply_button.pack(pady=10)
 
-    def apply_smoothing(self, method, border_option):
+    def apply_smoothing(self, method, border_option, kernel_val):
         if method == "average":
             kernel = np.ones((3, 3), np.float32) / 9
         elif method == "weighted":
-            kernel = np.array([[1, 2, 1], [2, 4, 2], [1, 2, 1]], np.float32) / 16
+            kernel = np.array([[1, 2, 1], [2, kernel_val, 2], [1, 2, 1]], np.float32) / 16
         elif method == "gaussian":
             kernel = cv2.getGaussianKernel(3, 0) * cv2.getGaussianKernel(3, 0).T
         else:
             raise ValueError("Nieprawidłowa metoda wygładzania.")
 
         # border_type = self.convertBorderOptionToType(border_option)
-        print('Tutaj border type: ', border_option)
 
         self.image = self.apply_border(self.image, border_option)
 
@@ -787,16 +794,25 @@ class ImageWindow:
         Label(canny_window, text="Progi detekcji krawędzi").pack(pady=10)
 
         # Prog dolny
-        Label(canny_window, text="Dolny próg:").pack()
-        lower_threshold = Scale(canny_window, from_=0, to=255, orient=HORIZONTAL)
-        lower_threshold.set(50)
-        lower_threshold.pack()
+        first_frame = Frame(canny_window)
+        first_frame.pack(pady=5)
 
+        Label(first_frame, text="Dolny próg:").pack()
+        Button(first_frame, text="<", command=lambda: update_scale(lower_threshold, -1)).pack(side="left")
+        lower_threshold = Scale(first_frame, from_=0, to=255, orient=HORIZONTAL)
+        lower_threshold.set(50)
+        lower_threshold.pack(side="left", padx=5)
+        Button(first_frame, text=">", command=lambda: update_scale(lower_threshold, 1)).pack(side="left")
+
+        second_frame = Frame(canny_window)
+        second_frame.pack(pady=5)
         # Prog górny
-        Label(canny_window, text="Górny próg:").pack()
-        upper_threshold = Scale(canny_window, from_=0, to=255, orient=HORIZONTAL)
+        Label(second_frame, text="Górny próg:").pack()
+        Button(second_frame, text="<", command=lambda: update_scale(upper_threshold, -1)).pack(side="left")
+        upper_threshold = Scale(second_frame, from_=0, to=255, orient=HORIZONTAL)
         upper_threshold.set(150)
-        upper_threshold.pack()
+        upper_threshold.pack(side="left", padx=5)
+        Button(second_frame, text=">", command=lambda: update_scale(upper_threshold, 1)).pack(side="left")
 
         apply_button = Button(canny_window, text="Zastosuj",
                               command=lambda: self.apply_canny_edge_detection(lower_threshold.get(),
@@ -813,3 +829,73 @@ class ImageWindow:
         self.image = edges
         self.is_monochrome = check_if_monochrome(self.image)
         self.display_image()
+
+    def apply_double_threshold(self):
+        threshold_window = Toplevel(self.top)
+        threshold_window.title("Progowanie z dwoma progami")
+        threshold_window.geometry('300x200')
+
+        first_frame = Frame(threshold_window)
+        first_frame.pack(pady=5)
+
+        Button(first_frame, text="<", command=lambda: update_scale(lower_threshold, -1)).pack(side="left")
+        lower_threshold = Scale(first_frame, from_=0, to=255, orient=HORIZONTAL)
+        lower_threshold.pack(side="left", padx=5)
+        Button(first_frame, text=">", command=lambda: update_scale(lower_threshold, 1)).pack(side="left")
+
+        second_frame = Frame(threshold_window)
+        second_frame.pack(pady=5)
+        Button(second_frame, text="<", command=lambda: update_scale(upper_threshold, -1)).pack(side="left")
+        upper_threshold = Scale(second_frame, from_=0, to=255, orient=HORIZONTAL)
+        upper_threshold.pack(side="left", padx=5)
+        Button(second_frame, text=">", command=lambda: update_scale(upper_threshold, 1)).pack(side="left")
+
+        apply_button = Button(threshold_window, text="Zastosuj",
+                              command=lambda: self.perform_double_threshold(lower_threshold.get(),
+                                                                            upper_threshold.get()))
+        apply_button.pack()
+
+    def perform_double_threshold(self, lower, upper):
+        if len(self.image.shape) > 2:
+            gray_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray_image = self.image
+        # _, thresh = cv2.threshold(gray_image, lower, upper, cv2.THRESH_BINARY)
+        used_lower, lower_thresh = cv2.threshold(gray_image, lower, 255, cv2.THRESH_BINARY)
+        used_upper, upper_thresh = cv2.threshold(gray_image, upper, 255, cv2.THRESH_BINARY_INV)
+        combined_thresh = cv2.bitwise_and(lower_thresh, upper_thresh)
+        self.image = combined_thresh
+        self.display_image()
+        self.show_threshold_values(used_lower, used_upper)
+
+    def show_threshold_values(self, lower, upper=None):
+        threshold_info_window = Toplevel()
+        threshold_info_window.title("Użyte progi")
+        threshold_info_window.geometry("200x100")
+
+        if upper:
+            Label(threshold_info_window, text=f"Dolny próg: {lower}").pack()
+            Label(threshold_info_window, text=f"Górny próg: {upper}").pack()
+        else:
+            Label(threshold_info_window, text=f"Próg: {lower}").pack()
+
+    def apply_otsu_threshold(self):
+        if len(self.image.shape) > 2:
+            gray_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray_image = self.image
+        used, thresh = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        self.image = thresh
+        self.display_image()
+
+        self.show_threshold_values(used)
+
+    def apply_adaptive_threshold(self):
+        if len(self.image.shape) > 2:
+            gray_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray_image = self.image
+        thresh = cv2.adaptiveThreshold(gray_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+        self.image = thresh
+        self.display_image()
+
